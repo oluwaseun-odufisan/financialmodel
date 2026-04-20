@@ -8,8 +8,8 @@ export default function Login() {
   const nav = useNavigate();
   const { login, register } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [email, setEmail] = useState('demo@flourmills.local');
-  const [password, setPassword] = useState('Demo1234');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
