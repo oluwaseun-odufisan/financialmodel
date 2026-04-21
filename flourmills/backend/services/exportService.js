@@ -53,7 +53,7 @@ function drawPageChrome(doc, project, options = {}) {
 
   doc.save();
   doc.roundedRect(left, top, width, bandHeight, 14).fill(`#${PRIMARY}`);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(17).text(options.reportTitle || 'Flour Mills Finance Report', left + 18, top + 15);
+  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(17).text(options.reportTitle || 'Project Finance Report', left + 18, top + 15);
   doc.fillColor('#D8E4F3').font('Helvetica').fontSize(9).text(project.projectName, left + 18, top + 36);
   doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(12).text(options.sectionTitle || '', left + width - 190, top + 16, { width: 172, align: 'right' });
   doc.fillColor('#D8E4F3').font('Helvetica').fontSize(8.5).text(options.sectionSubtitle || '', left + width - 220, top + 34, { width: 202, align: 'right' });
@@ -355,8 +355,8 @@ function drawCoverPage(doc, project, options = {}) {
 
   doc.save();
   doc.roundedRect(left, top, width, 118, 18).fill(`#${PRIMARY}`);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(24).text('Flour Mills Finance Report', left + 24, top + 24);
-  doc.font('Helvetica').fontSize(11).fillColor('#D8E4F3').text(options.coverSubtitle || 'Formal project report pack for internal and external circulation.', left + 24, top + 58, { width: width - 48 });
+  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(24).text('Project Finance Report', left + 24, top + 24);
+  doc.font('Helvetica').fontSize(11).fillColor('#D8E4F3').text(options.coverSubtitle || '', left + 24, top + 58, { width: width - 48 });
   doc.restore();
 
   let y = top + 154;
@@ -364,7 +364,7 @@ function drawCoverPage(doc, project, options = {}) {
   y += 34;
 
   const metadata = [
-    ['Export Scope', options.scope === 'summary' ? 'Deal Summary' : 'Full Report Pack'],
+    ['Export Scope', options.scope === 'summary' ? 'Deal Summary' : 'Full Report'],
     ['Prepared For', 'Formal organizational submission'],
     ['Exported By', options.exportedBy || 'System user'],
     ['Generated On', new Date().toLocaleString()],
@@ -378,15 +378,7 @@ function drawCoverPage(doc, project, options = {}) {
     y += 26;
   });
 
-  y += 14;
-  doc.roundedRect(left, y, width, 94, 14).fillAndStroke(SURFACE, BORDER);
-  doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(11).text('Report Standard', left + 18, y + 18);
-  doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(
-    'This export is arranged as a fixed-page report pack with section-aware page orientation, repeated table headers, controlled margins, and wide-table splitting for formal readability.',
-    left + 18,
-    y + 38,
-    { width: width - 36, lineGap: 2 }
-  );
+
 }
 
 function drawSummaryFooter(doc, generatedAt) {
@@ -534,18 +526,18 @@ function buildFullPdf(doc, project, options) {
   drawCoverPage(doc, project, {
     scope: 'full',
     exportedBy: options.exportedBy,
-    coverSubtitle: 'Comprehensive report pack including assumptions, schedules, statements, and monthly extracts.',
+    coverSubtitle: '',
   });
 
   const portraitHeader = createSectionFactory(doc, project, {
-    reportTitle: 'Flour Mills Finance Report',
-    sectionTitle: 'Full Report Pack',
+    reportTitle: 'Project Finance Report',
+    sectionTitle: 'Full Report',
     sectionSubtitle: 'Executive and schedule detail',
     layout: 'portrait',
   });
 
   let y = portraitHeader();
-  y = drawSectionHeading(doc, y, 'Executive Summary', 'Headline project economics and coverage metrics.');
+  y = drawSectionHeading(doc, y, 'Executive Summary', '');
   y = drawMetricGrid(
     doc,
     y,
@@ -564,7 +556,7 @@ function buildFullPdf(doc, project, options) {
     { columns: 3 }
   );
 
-  y = drawSectionHeading(doc, y + 4, 'Deal Context', 'Reference information for formal review and document control.');
+  y = drawSectionHeading(doc, y + 4, 'Deal Context', '');
   y = drawTwoColumnSummary(
     doc,
     y,
@@ -595,7 +587,7 @@ function buildFullPdf(doc, project, options) {
     portraitHeader
   );
 
-  y = drawSectionHeading(doc, y + 2, 'Assumptions Snapshot', 'Selected assumptions carried into the current model run.');
+  y = drawSectionHeading(doc, y + 2, 'Assumptions', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -616,7 +608,7 @@ function buildFullPdf(doc, project, options) {
     { freezeColumns: 1 }
   );
 
-  y = drawSectionHeading(doc, y + 2, 'BOQ Summary', 'Capital allocation by category, including modeled adders.');
+  y = drawSectionHeading(doc, y + 2, 'BOQ Summary', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -638,14 +630,14 @@ function buildFullPdf(doc, project, options) {
   );
 
   const landscapeHeader = createSectionFactory(doc, project, {
-    reportTitle: 'Flour Mills Finance Report',
+    reportTitle: 'Project Finance Report',
     sectionTitle: 'Statements and Schedules',
-    sectionSubtitle: 'Wide-table pack',
+    sectionSubtitle: '',
     layout: 'landscape',
   });
 
   y = landscapeHeader();
-  y = drawSectionHeading(doc, y, 'Sensitivity Analysis', 'Scenario comparison formatted on landscape pages to preserve readability.');
+  y = drawSectionHeading(doc, y, 'Sensitivity Analysis', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -673,7 +665,7 @@ function buildFullPdf(doc, project, options) {
     { freezeColumns: 1 }
   );
 
-  y = drawSectionHeading(doc, y + 2, 'Income Statement (NGN Millions)', 'Year-by-year statement outputs from the modeled annual roll-up.');
+  y = drawSectionHeading(doc, y + 2, 'Income Statement (NGN Millions)', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -696,7 +688,7 @@ function buildFullPdf(doc, project, options) {
     { freezeColumns: 1, chunkLabel: 'Income statement part' }
   );
 
-  y = drawSectionHeading(doc, y + 2, 'DSCR Schedule', 'Coverage schedule with repeated headers across page breaks.');
+  y = drawSectionHeading(doc, y + 2, 'DSCR Schedule', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -721,7 +713,7 @@ function buildFullPdf(doc, project, options) {
     { freezeColumns: 1 }
   );
 
-  y = drawSectionHeading(doc, y + 2, 'Depreciation Schedule (NGN Millions)', 'Wide depreciation schedules are kept readable through landscape layout and controlled splitting.');
+  y = drawSectionHeading(doc, y + 2, 'Depreciation Schedule (NGN Millions)', '');
   y = drawAdaptiveTable(
     doc,
     y,
@@ -743,7 +735,7 @@ function buildFullPdf(doc, project, options) {
     { freezeColumns: 1, chunkLabel: 'Depreciation table part' }
   );
 
-  y = drawSectionHeading(doc, y + 2, 'Monthly Calculation Extract', 'Monthly periods are exported in repeated fixed-column segments so no values are cut off.');
+  y = drawSectionHeading(doc, y + 2, 'Monthly Calculation', '');
   drawAdaptiveTable(
     doc,
     y,
@@ -778,7 +770,7 @@ function buildFullPdf(doc, project, options) {
 
 export async function buildExcelWorkbook(project) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Flour Mills Financial System';
+  workbook.creator = 'Financial Modelling System';
   workbook.created = new Date();
   const result = project.result;
   if (!result) throw new Error('Project has not been run yet.');
@@ -1005,8 +997,8 @@ export function buildPdfStream(project, res, options = {}) {
     Title: `${project.projectName || 'Project'} ${options.scope === 'summary' ? 'Deal Summary' : 'Full Report'}`,
     Author: 'FundCo Capital Managers',
     Subject: 'Financial model export',
-    Creator: 'Flour Mills Financial System',
-    Producer: 'Flour Mills Financial System',
+    Creator: 'FundCo Financial System',
+    Producer: 'FundCo Financial System',
     CreationDate: new Date(),
   };
   doc.pipe(res);
