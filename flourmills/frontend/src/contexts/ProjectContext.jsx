@@ -60,9 +60,8 @@ export function ProjectProvider({ children }) {
     setProjects((ps) => ps.map((p) => ((p._id || p.id) === id ? project : p)));
   };
 
-  const runModel = async () => {
-    if (!current) return;
-    const id = current._id || current.id;
+  const runModelById = async (id) => {
+    if (!id) return;
     setRunning(true); setRunProgress(10); setError(null);
     const tick = setInterval(() => setRunProgress((p) => (p < 85 ? p + 7 : p)), 180);
     try {
@@ -77,6 +76,11 @@ export function ProjectProvider({ children }) {
       clearInterval(tick);
       setTimeout(() => { setRunning(false); setRunProgress(0); }, 400);
     }
+  };
+
+  const runModel = async () => {
+    if (!current) return;
+    return runModelById(current._id || current.id);
   };
 
   const createProject = async ({ projectName, template = 'flour_mills' }) => {
@@ -107,7 +111,7 @@ export function ProjectProvider({ children }) {
       value={{
         projects, current, currentId, setCurrentId,
         loading, error, refresh, updateAssumptionDeep,
-        runModel, running, runProgress,
+        runModel, runModelById, running, runProgress,
         createProject, duplicateProject, deleteProject, renameProject,
       }}
     >

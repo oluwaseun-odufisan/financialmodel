@@ -4,96 +4,113 @@ import { requireAuth } from '../middleware/auth.js';
 import { runModel, runSensitivity } from '../services/financialEngine.js';
 import { getTemplate, derive } from '../services/seedData.js';
 import { buildExcelWorkbook, buildPdfStream } from '../services/exportService.js';
+import { logAuditEvent } from '../services/auditService.js';
 
 const router = express.Router();
 router.use(requireAuth);
 
-/** GET /api/projects — list the user's projects, newest first */
+function getProjectId(project) {
+  return String(project._id || project.id);
+}
+
 router.get('/', async (req, res) => {
   try {
-    const projects = await Project.find({ userId: req.user.id })
-      .sort({ updatedAt: -1 })
-      .lean();
+    const projects = await Project.find({ userId: req.user.id }).sort({ updatedAt: -1 }).lean();
     res.json({ projects });
-  } catch (e) {
-    console.error('[projects/list]', e);
+  } catch (error) {
+    console.error('[projects/list]', error);
     res.status(500).json({ error: 'Failed to list projects' });
   }
 });
 
-/**
- * POST /api/projects
- * Body:
- *   {
- *     projectName: string,
- *     template:    'flour_mills' | 'blank'   (default: 'flour_mills')
- *   }
- */
 router.post('/', async (req, res) => {
   try {
     const { projectName, template } = req.body || {};
     if (!projectName || !projectName.trim()) {
       return res.status(400).json({ error: 'Project name is required' });
     }
-    const tpl = template === 'blank' ? 'blank' : 'flour_mills';
-    const assumption = getTemplate(tpl, projectName.trim());
+
+    const selectedTemplate = template === 'blank' ? 'blank' : 'flour_mills';
+    const assumption = getTemplate(selectedTemplate, projectName.trim());
     assumption.projectName = projectName.trim();
 
     const project = await Project.create({
       userId: req.user.id,
       projectName: projectName.trim(),
-      template: tpl,
+      template: selectedTemplate,
       location: assumption.location || {},
       assumption,
       result: null,
     });
+
+    await logAuditEvent(req, {
+      action: 'project.create',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { template: selectedTemplate },
+    });
+
     res.json({ project });
-  } catch (e) {
-    console.error('[projects/create]', e);
+  } catch (error) {
+    console.error('[projects/create]', error);
     res.status(500).json({ error: 'Failed to create project' });
   }
 });
 
-/** GET /api/projects/:id */
 router.get('/:id', async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json({ project });
-  } catch (e) {
-    console.error('[projects/get]', e);
+  } catch (error) {
+    console.error('[projects/get]', error);
     res.status(500).json({ error: 'Failed to fetch project' });
   }
 });
 
-/** PUT /api/projects/:id — patch assumption tree and/or projectName */
 router.put('/:id', async (req, res) => {
   try {
     const { assumption, projectName } = req.body || {};
     const patch = {};
+    const changedFields = [];
+
     if (assumption) {
       patch.assumption = derive(assumption);
-      patch.result = null;          // invalidate previous run
+      patch.result = null;
       patch.lastRunAt = null;
+      changedFields.push('assumption');
     }
+
     if (projectName) {
       patch.projectName = String(projectName).trim();
       if (patch.assumption) patch.assumption.projectName = patch.projectName;
+      changedFields.push('projectName');
     }
+
     const project = await Project.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       patch,
       { new: true }
     ).lean();
+
     if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    await logAuditEvent(req, {
+      action: 'project.update',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { changedFields },
+    });
+
     res.json({ project });
-  } catch (e) {
-    console.error('[projects/update]', e);
+  } catch (error) {
+    console.error('[projects/update]', error);
     res.status(500).json({ error: 'Failed to update project' });
   }
 });
 
-/** POST /api/projects/:id/run — execute the engine and persist result */
 router.post('/:id/run', async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.user.id });
@@ -106,79 +123,131 @@ router.post('/:id/run', async (req, res) => {
     project.result = { ...result, sensitivity };
     project.lastRunAt = new Date();
     await project.save();
+
+    await logAuditEvent(req, {
+      action: 'project.run',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: {
+        runAt: project.lastRunAt.toISOString(),
+        projectIRR: project.result?.kpis?.projectIRR ?? null,
+        equityIRR: project.result?.kpis?.equityIRR ?? null,
+      },
+    });
+
     res.json({ project: project.toObject() });
-  } catch (e) {
-    console.error('[projects/run]', e);
-    res.status(500).json({ error: 'Model run failed: ' + e.message });
+  } catch (error) {
+    console.error('[projects/run]', error);
+    res.status(500).json({ error: `Model run failed: ${error.message}` });
   }
 });
 
-/** POST /api/projects/:id/duplicate — clone a project */
 router.post('/:id/duplicate', async (req, res) => {
   try {
-    const src = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
-    if (!src) return res.status(404).json({ error: 'Project not found' });
-    const newName = (req.body?.projectName || `${src.projectName} (copy)`).trim();
-    const assumption = JSON.parse(JSON.stringify(src.assumption));
+    const source = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
+    if (!source) return res.status(404).json({ error: 'Project not found' });
+
+    const newName = (req.body?.projectName || `${source.projectName} (copy)`).trim();
+    const assumption = JSON.parse(JSON.stringify(source.assumption));
     assumption.projectName = newName;
+
     const project = await Project.create({
       userId: req.user.id,
       projectName: newName,
-      template: src.template || 'flour_mills',
-      location: src.location || {},
+      template: source.template || 'flour_mills',
+      location: source.location || {},
       assumption,
       result: null,
     });
+
+    await logAuditEvent(req, {
+      action: 'project.duplicate',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { sourceProjectId: getProjectId(source), sourceProjectName: source.projectName },
+    });
+
     res.json({ project });
-  } catch (e) {
-    console.error('[projects/duplicate]', e);
+  } catch (error) {
+    console.error('[projects/duplicate]', error);
     res.status(500).json({ error: 'Failed to duplicate project' });
   }
 });
 
-/** DELETE /api/projects/:id */
 router.delete('/:id', async (req, res) => {
   try {
-    const r = await Project.deleteOne({ _id: req.params.id, userId: req.user.id });
-    if (r.deletedCount === 0) return res.status(404).json({ error: 'Project not found' });
+    const project = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    await Project.deleteOne({ _id: req.params.id, userId: req.user.id });
+
+    await logAuditEvent(req, {
+      action: 'project.delete',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { deletedAt: new Date().toISOString() },
+    });
+
     res.json({ deleted: true });
-  } catch (e) {
-    console.error('[projects/delete]', e);
+  } catch (error) {
+    console.error('[projects/delete]', error);
     res.status(500).json({ error: 'Delete failed' });
   }
 });
 
-/** GET /api/projects/:id/export/excel */
 router.get('/:id/export/excel', async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
     if (!project) return res.status(404).json({ error: 'Project not found' });
     if (!project.result) return res.status(400).json({ error: 'Run the model before exporting' });
-    const wb = await buildExcelWorkbook(project);
+
+    const workbook = await buildExcelWorkbook(project);
     const filename = `${(project.projectName || 'project').replace(/[^\w]+/g, '_')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    await wb.xlsx.write(res);
+    await workbook.xlsx.write(res);
     res.end();
-  } catch (e) {
-    console.error('[projects/export/excel]', e);
-    res.status(500).json({ error: 'Export failed: ' + e.message });
+
+    await logAuditEvent(req, {
+      action: 'project.export.excel',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { format: 'excel', scope: 'full', filename },
+    });
+  } catch (error) {
+    console.error('[projects/export/excel]', error);
+    res.status(500).json({ error: `Export failed: ${error.message}` });
   }
 });
 
-/** GET /api/projects/:id/export/pdf */
 router.get('/:id/export/pdf', async (req, res) => {
   try {
     const project = await Project.findOne({ _id: req.params.id, userId: req.user.id }).lean();
     if (!project) return res.status(404).json({ error: 'Project not found' });
     if (!project.result) return res.status(400).json({ error: 'Run the model before exporting' });
-    const filename = `${(project.projectName || 'project').replace(/[^\w]+/g, '_')}.pdf`;
+
+    const scope = req.query.scope === 'summary' ? 'summary' : 'full';
+    const suffix = scope === 'summary' ? '_deal_summary' : '_full_report';
+    const filename = `${(project.projectName || 'project').replace(/[^\w]+/g, '_')}${suffix}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    buildPdfStream(project, res);
-  } catch (e) {
-    console.error('[projects/export/pdf]', e);
-    res.status(500).json({ error: 'Export failed: ' + e.message });
+
+    await logAuditEvent(req, {
+      action: 'project.export.pdf',
+      entityType: 'project',
+      entityId: getProjectId(project),
+      entityName: project.projectName,
+      metadata: { format: 'pdf', scope, filename },
+    });
+
+    buildPdfStream(project, res, { scope, exportedBy: req.user?.name || req.user?.email || 'System user' });
+  } catch (error) {
+    console.error('[projects/export/pdf]', error);
+    res.status(500).json({ error: `Export failed: ${error.message}` });
   }
 });
 

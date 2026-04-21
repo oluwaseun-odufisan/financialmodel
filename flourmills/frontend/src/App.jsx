@@ -17,7 +17,7 @@ function Protected({ children }) {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-sm text-muted">Loading…</div>
+        <div className="text-sm text-[var(--text-muted)]">Loading...</div>
       </div>
     );
   }
@@ -28,7 +28,7 @@ function Protected({ children }) {
 /** For pages that require a current project. Falls through to /projects if none. */
 function RequireProject({ children }) {
   const { current, loading } = useProject();
-  if (loading) return <div className="text-sm text-muted">Loading projects…</div>;
+  if (loading) return <div className="text-sm text-[var(--text-muted)]">Loading projects...</div>;
   if (!current) return <Navigate to="/projects" replace />;
   return children;
 }

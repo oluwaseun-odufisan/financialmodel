@@ -1,30 +1,41 @@
 import { cn } from '../../lib/utils.js';
 
-export const Table = ({ className, ...p }) =>
+export const Table = ({ className, ...props }) => (
   <div className="w-full overflow-auto">
-    <table className={cn('w-full text-sm border-collapse', className)} {...p} />
-  </div>;
+    <table className={cn('w-full border-collapse text-sm', className)} {...props} />
+  </div>
+);
 
-export const THead = ({ className, ...p }) =>
-  <thead className={cn('bg-offwhite border-b border-border', className)} {...p} />;
+export const THead = ({ className, ...props }) => (
+  <thead className={cn('border-b border-[var(--border-soft)] bg-[var(--surface-muted)]', className)} {...props} />
+);
 
-export const TBody = ({ className, ...p }) => <tbody className={className} {...p} />;
+export const TBody = ({ className, ...props }) => <tbody className={className} {...props} />;
 
-export const TR = ({ className, ...p }) =>
-  <tr className={cn('border-b border-border last:border-0 hover:bg-offwhite/60', className)} {...p} />;
+export const TR = ({ className, ...props }) => (
+  <tr className={cn('border-b border-[var(--border-soft)] last:border-0 hover:bg-[var(--surface-muted)]/70', className)} {...props} />
+);
 
-export const TH = ({ className, align = 'left', ...p }) =>
-  <th className={cn(
-    'px-3 py-2.5 font-semibold text-xs uppercase tracking-wide text-muted whitespace-nowrap',
-    align === 'right' && 'text-right',
-    align === 'center' && 'text-center',
-    className
-  )} {...p} />;
+export const TH = ({ className, align = 'left', ...props }) => (
+  <th
+    className={cn(
+      'whitespace-nowrap px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]',
+      align === 'right' && 'text-right',
+      align === 'center' && 'text-center',
+      className
+    )}
+    {...props}
+  />
+);
 
-export const TD = ({ className, align = 'left', ...p }) =>
-  <td className={cn(
-    'px-3 py-2.5 text-sm text-ink whitespace-nowrap',
-    align === 'right' && 'text-right num',
-    align === 'center' && 'text-center',
-    className
-  )} {...p} />;
+export const TD = ({ className, align = 'left', ...props }) => (
+  <td
+      className={cn(
+      'whitespace-nowrap px-3 py-3 text-sm text-[var(--text-main)]',
+      align === 'right' && 'num text-right',
+      align === 'center' && 'text-center',
+      className
+    )}
+    {...props}
+  />
+);

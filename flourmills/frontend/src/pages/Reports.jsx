@@ -1,54 +1,56 @@
 import { useProject } from '../contexts/ProjectContext.jsx';
-import { Card, CardBody, CardDescription, CardHeader, CardTitle, Badge } from '../components/ui/Primitives.jsx';
+import { Badge, Card, CardBody, CardDescription, CardHeader, CardTitle } from '../components/ui/Primitives.jsx';
 import { Table, TBody, THead, TH, TR, TD } from '../components/ui/Table.jsx';
-import { fmtMillions, fmtPct, fmtMultiplier } from '../lib/utils.js';
-import { BarChart, Bar, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
+import { fmtMillions, fmtMultiplier, fmtPct } from '../lib/utils.js';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const PRIMARY = '#312783';
-const ACCENT  = '#36a9e1';
+const ACCENT = '#36a9e1';
+const SCENARIO_COLORS = ['#312783', '#36a9e1', '#0f766e', '#c2410c', '#475569', '#047857', '#1d4ed8', '#7c3aed'];
+
+const axisProps = {
+  stroke: '#667085',
+  fontSize: 11,
+  tickLine: false,
+  axisLine: { stroke: '#D7DEE7' },
+};
+
+const tooltipProps = {
+  contentStyle: { backgroundColor: 'var(--surface)', border: '1px solid var(--border-soft)', borderRadius: 10, fontSize: 12, color: 'var(--text-main)' },
+};
 
 export default function Reports() {
   const { current } = useProject();
-  if (!current) return <div className="text-sm text-muted">Loading…</div>;
+  if (!current) return <div className="text-sm text-[var(--text-muted)]">Loading...</div>;
+
   if (!current.result) {
     return (
-      <Card><CardBody className="text-center py-12">
-        <div className="text-lg font-semibold text-ink">No model results yet</div>
-        <p className="text-sm text-muted mt-1">Click <b>Run Model</b> to populate this page.</p>
-      </CardBody></Card>
+      <Card>
+        <CardBody className="py-12 text-center">
+          <div className="text-lg font-semibold text-[var(--text-main)]">No model results yet</div>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Click <b>Run Model</b> to populate this page.</p>
+        </CardBody>
+      </Card>
     );
   }
 
-  const r = current.result;
-  const sens = r.sensitivity || [];
-  const base = sens.find(s => s.scenario === 'Base Case') || sens[0];
-
-  const dscrData = r.financials.years.map((y, i) => ({
-    year: y,
-    dscr: r.kpis.dscrByYear?.[i] ?? null,
-    threshold: 1.2,
-  }));
-
-  const sensData = sens.map((s) => ({
-    name: s.scenario,
-    IRR: s.projectIRR ? s.projectIRR * 100 : 0,
-    equityIRR: s.equityIRR ? s.equityIRR * 100 : 0,
-    DSCR: s.avgDSCR || 0,
-  }));
+  const result = current.result;
+  const sensitivity = result.sensitivity || [];
+  const dscrData = result.financials.years.map((year, index) => ({ year, dscr: result.kpis.dscrByYear?.[index] ?? null, covenant: 1.2 }));
+  const sensitivityData = sensitivity.map((scenario) => ({ name: scenario.scenario, irr: scenario.projectIRR ? scenario.projectIRR * 100 : 0 }));
 
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-xs text-muted uppercase tracking-wider">Analysis</div>
-        <h1 className="text-2xl font-semibold text-ink">Reports</h1>
-        <p className="text-sm text-muted mt-1">Sensitivity analysis · DSCR schedule · scenario comparison</p>
+        <div className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Analysis</div>
+        <h1 className="text-2xl font-semibold text-[var(--text-main)]">Reports</h1>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">Sensitivity analysis · DSCR schedule · scenario comparison</p>
       </div>
 
-      {/* Sensitivity table */}
       <Card>
         <CardHeader>
           <CardTitle>Sensitivity Analysis</CardTitle>
-          <CardDescription>Base case + key shocks on tariff / capex / opex</CardDescription>
+          <CardDescription>Base case and modeled downside/upside scenario impact on returns and coverage.</CardDescription>
         </CardHeader>
         <Table>
           <THead>
@@ -64,21 +66,18 @@ export default function Reports() {
             </TR>
           </THead>
           <TBody>
-            {sens.map((s) => {
-              const isBase = s.scenario === 'Base Case';
+            {sensitivity.map((scenario) => {
+              const isBase = scenario.scenario === 'Base Case';
               return (
-                <TR key={s.scenario} className={isBase ? 'bg-primary-50' : ''}>
-                  <TD className={isBase ? 'font-semibold text-primary' : 'font-medium'}>
-                    {s.scenario}
-                    {isBase && <Badge variant="primary" className="ml-2">Base</Badge>}
-                  </TD>
-                  <TD align="right">₦{s.targetTariff.toFixed(2)}</TD>
-                  <TD align="right">{fmtPct(s.projectIRR, 1)}</TD>
-                  <TD align="right">{fmtPct(s.equityIRR, 1)}</TD>
-                  <TD align="right">{fmtMillions(s.projectNPV, 1)}</TD>
-                  <TD align="right">{fmtMultiplier(s.avgDSCR)}</TD>
-                  <TD align="right">{fmtMultiplier(s.minDSCR)}</TD>
-                  <TD align="center">{s.paybackYear || '—'}</TD>
+                <TR key={scenario.scenario} className={isBase ? 'bg-primary-50' : ''}>
+                  <TD className={isBase ? 'font-semibold text-primary' : 'font-medium'}>{scenario.scenario} {isBase && <Badge variant="primary" className="ml-2">Base</Badge>}</TD>
+                  <TD align="right">{`NGN ${scenario.targetTariff.toFixed(2)}`}</TD>
+                  <TD align="right">{fmtPct(scenario.projectIRR, 1)}</TD>
+                  <TD align="right">{fmtPct(scenario.equityIRR, 1)}</TD>
+                  <TD align="right">{fmtMillions(scenario.projectNPV, 1)}</TD>
+                  <TD align="right">{fmtMultiplier(scenario.avgDSCR)}</TD>
+                  <TD align="right">{fmtMultiplier(scenario.minDSCR)}</TD>
+                  <TD align="center">{scenario.paybackYear || '-'}</TD>
                 </TR>
               );
             })}
@@ -86,22 +85,21 @@ export default function Reports() {
         </Table>
       </Card>
 
-      {/* Sensitivity bar chart - IRR */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Project IRR Sensitivity</CardTitle>
-            <CardDescription>% per scenario</CardDescription>
+            <CardTitle>Project IRR by Scenario</CardTitle>
+            <CardDescription>Simple comparison of return sensitivity across modeled cases.</CardDescription>
           </CardHeader>
           <CardBody className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sensData} margin={{ left: 0, right: 8, top: 8, bottom: 24 }}>
+              <BarChart data={sensitivityData} margin={{ left: 0, right: 8, top: 8, bottom: 24 }}>
                 <CartesianGrid stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="name" stroke="#6b7280" fontSize={10} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} angle={-25} textAnchor="end" height={60} />
-                <YAxis stroke="#6b7280" fontSize={11} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12 }} formatter={(v) => `${v.toFixed(1)}%`} />
-                <Bar dataKey="IRR" fill={PRIMARY}>
-                  {sensData.map((d, i) => <Cell key={i} fill={d.name === 'Base Case' ? ACCENT : PRIMARY} />)}
+                <XAxis dataKey="name" {...axisProps} angle={-22} textAnchor="end" height={56} />
+                <YAxis {...axisProps} />
+                <Tooltip {...tooltipProps} formatter={(value) => `${value.toFixed(1)}%`} />
+                <Bar dataKey="irr">
+                  {sensitivityData.map((item, index) => <Cell key={item.name} fill={item.name === 'Base Case' ? ACCENT : SCENARIO_COLORS[index % SCENARIO_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -110,30 +108,28 @@ export default function Reports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>DSCR by Year</CardTitle>
-            <CardDescription>EBITDA ÷ debt service · threshold 1.2×</CardDescription>
+            <CardTitle>DSCR Trend</CardTitle>
+            <CardDescription>Annual coverage compared against the 1.2x covenant line.</CardDescription>
           </CardHeader>
           <CardBody className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dscrData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+              <LineChart data={dscrData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
                 <CartesianGrid stroke="#E5E7EB" vertical={false} />
-                <XAxis dataKey="year" stroke="#6b7280" fontSize={11} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} />
-                <YAxis stroke="#6b7280" fontSize={11} tickLine={false} axisLine={{ stroke: '#E5E7EB' }} domain={[0, 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12 }} formatter={(v) => v === null ? '—' : `${v.toFixed(2)}x`} />
-                <Bar dataKey="dscr">
-                  {dscrData.map((d, i) => <Cell key={i} fill={(d.dscr ?? 0) >= 1.2 ? PRIMARY : '#DC2626'} />)}
-                </Bar>
-              </BarChart>
+                <XAxis dataKey="year" {...axisProps} />
+                <YAxis {...axisProps} domain={[0, 'auto']} />
+                <Tooltip {...tooltipProps} formatter={(value) => (value === null ? '-' : `${value.toFixed(2)}x`)} />
+                <Line type="monotone" dataKey="dscr" stroke={PRIMARY} strokeWidth={2.5} dot={{ r: 3, fill: PRIMARY }} name="DSCR" />
+                <Line type="monotone" dataKey="covenant" stroke="#DC2626" strokeWidth={2} strokeDasharray="4 4" dot={false} name="Covenant 1.2x" />
+              </LineChart>
             </ResponsiveContainer>
           </CardBody>
         </Card>
       </div>
 
-      {/* DSCR detailed table */}
       <Card>
         <CardHeader>
           <CardTitle>DSCR Detail</CardTitle>
-          <CardDescription>Annual coverage ratios</CardDescription>
+          <CardDescription>Annual coverage ratios and covenant health indicators.</CardDescription>
         </CardHeader>
         <Table>
           <THead>
@@ -146,21 +142,18 @@ export default function Reports() {
             </TR>
           </THead>
           <TBody>
-            {r.financials.years.map((y, i) => {
-              const ebitda = r.financials.incomeStatement.ebitda[i];
-              const ds = -(r.financials.cashFlow.principalRepayments[i] + r.financials.cashFlow.interestPaid[i]);
-              const dscr = r.kpis.dscrByYear?.[i];
+            {result.financials.years.map((year, index) => {
+              const ebitda = result.financials.incomeStatement.ebitda[index];
+              const debtService = -(result.financials.cashFlow.principalRepayments[index] + result.financials.cashFlow.interestPaid[index]);
+              const dscr = result.kpis.dscrByYear?.[index];
               return (
-                <TR key={y}>
-                  <TD className="font-medium">{y}</TD>
+                <TR key={year}>
+                  <TD className="font-medium">{year}</TD>
                   <TD align="right">{fmtMillions(ebitda, 1)}</TD>
-                  <TD align="right">{fmtMillions(ds, 1)}</TD>
+                  <TD align="right">{fmtMillions(debtService, 1)}</TD>
                   <TD align="right" className="font-semibold">{fmtMultiplier(dscr)}</TD>
                   <TD align="center">
-                    {dscr === null || dscr === undefined ? <Badge variant="neutral">—</Badge>
-                      : dscr >= 1.4 ? <Badge variant="success">Strong</Badge>
-                      : dscr >= 1.2 ? <Badge variant="accent">Adequate</Badge>
-                      : <Badge variant="danger">Breach</Badge>}
+                    {dscr === null || dscr === undefined ? <Badge variant="neutral">-</Badge> : dscr >= 1.4 ? <Badge variant="success">Strong</Badge> : dscr >= 1.2 ? <Badge variant="accent">Adequate</Badge> : <Badge variant="danger">Breach</Badge>}
                   </TD>
                 </TR>
               );

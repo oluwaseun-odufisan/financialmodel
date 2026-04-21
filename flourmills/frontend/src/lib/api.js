@@ -40,6 +40,20 @@ async function request(path, options = {}) {
   return res;
 }
 
+async function extractBlobError(response, fallbackMessage) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    return data.error || fallbackMessage;
+  }
+  try {
+    const text = await response.text();
+    return text || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
+
 export const api = {
   login:    (email, password)        => request('/api/auth/login',    { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (email, password, name)  => request('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
@@ -58,7 +72,7 @@ export const api = {
     const url = `${API_BASE}/api/projects/${id}/export/excel`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
-    if (!res.ok) throw new Error('Excel export failed');
+    if (!res.ok) throw new Error(await extractBlobError(res, 'Excel export failed'));
     const blob = await res.blob();
     const downloadUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -68,12 +82,12 @@ export const api = {
     URL.revokeObjectURL(downloadUrl);
   },
 
-  downloadPdf: async (id, filename = 'project.pdf') => {
+  downloadPdf: async (id, filename = 'project.pdf', scope = 'full') => {
     const token = getToken();
-    const url = `${API_BASE}/api/projects/${id}/export/pdf`;
+    const url = `${API_BASE}/api/projects/${id}/export/pdf?scope=${encodeURIComponent(scope)}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
-    if (!res.ok) throw new Error('PDF export failed');
+    if (!res.ok) throw new Error(await extractBlobError(res, 'PDF export failed'));
     const blob = await res.blob();
     const downloadUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');

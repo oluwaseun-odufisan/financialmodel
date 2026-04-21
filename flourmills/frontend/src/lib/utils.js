@@ -1,43 +1,40 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-/** cn() — Tailwind class merger (shadcn-style). */
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-/* ------------------------------------------------------------------------- *
- *  Number / currency / percent formatters
- * ------------------------------------------------------------------------- */
-export const fmtNumber = (v, decimals = 0) => {
-  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  return Number(v).toLocaleString(undefined, {
+export const fmtNumber = (value, decimals = 0) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  return Number(value).toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
 };
 
-export const fmtCurrency = (v, decimals = 0) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '—' : `₦ ${fmtNumber(v, decimals)}`;
+export const fmtCurrency = (value, decimals = 0) =>
+  value === null || value === undefined || !Number.isFinite(value) ? '—' : `NGN ${fmtNumber(value, decimals)}`;
 
-export const fmtMillions = (v, decimals = 1) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '—' : `₦ ${fmtNumber(v / 1e6, decimals)}M`;
+export const fmtMillions = (value, decimals = 1) =>
+  value === null || value === undefined || !Number.isFinite(value) ? '—' : `NGN ${fmtNumber(value / 1e6, decimals)}M`;
 
-export const fmtPct = (v, decimals = 2) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(decimals)}%`;
+export const fmtPct = (value, decimals = 2) =>
+  value === null || value === undefined || !Number.isFinite(value) ? '—' : `${(value * 100).toFixed(decimals)}%`;
 
-export const fmtMultiplier = (v, decimals = 2) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '—' : `${v.toFixed(decimals)}x`;
+export const fmtMultiplier = (value, decimals = 2) =>
+  value === null || value === undefined || !Number.isFinite(value) ? '—' : `${value.toFixed(decimals)}x`;
 
 export const fmtDate = (iso) => {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d)) return '—';
-  return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
 export const fmtMonth = (iso) => {
   if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short' });
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-GB', { year: 'numeric', month: 'short' });
 };

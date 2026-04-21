@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useProject } from '../contexts/ProjectContext.jsx';
-import { Button, Card, CardBody, CardDescription, CardHeader, CardTitle, Input } from '../components/ui/Primitives.jsx';
+import { Button, Input, Badge } from '../components/ui/Primitives.jsx';
 import { Table, THead, TBody, TR, TH, TD } from '../components/ui/Table.jsx';
 import { fmtCurrency } from '../lib/utils.js';
 import { Save, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const ROWS = [
-  { key: 'solarPV',                 label: '1. Solar PV',                 note: 'Panels, mounting, DC cabling' },
-  { key: 'invertersAccessories',    label: '2. Inverters & Accessories',  note: 'Hybrid inverters + AC cabling' },
-  { key: 'energyStorage',           label: '3. Energy Storage',           note: 'LFP batteries' },
-  { key: 'ccmpptStringInverter',    label: '4. CCMPPT / String Inverter', note: 'String-level MPPT' },
-  { key: 'distributionBox',         label: '5. Distribution Box',         note: 'AC/DC distribution panels' },
-  { key: 'balanceOfSystems',        label: '6. Balance of Systems (BOS)', note: 'Protection, bus-bars, hardware' },
-  { key: 'otherAccessories',        label: '7. Other Accessories',        note: 'Cable trays, fire, misc.' },
-  { key: 'generalCostsCivilWorks',  label: '8. Civil Works',              note: 'Civil, structural, earthing' },
-  { key: 'others',                  label: '9. Others',                   note: 'Any residual line items' },
+  { key: 'solarPV', label: 'Solar PV', note: 'Panels, mounting, DC cabling' },
+  { key: 'invertersAccessories', label: 'Inverters & Accessories', note: 'Hybrid inverters and AC cabling' },
+  { key: 'energyStorage', label: 'Energy Storage', note: 'LFP batteries' },
+  { key: 'ccmpptStringInverter', label: 'CCMPPT / String Inverter', note: 'String-level MPPT' },
+  { key: 'distributionBox', label: 'Distribution Box', note: 'AC/DC distribution panels' },
+  { key: 'balanceOfSystems', label: 'Balance of Systems', note: 'Protection, bus-bars, hardware' },
+  { key: 'otherAccessories', label: 'Other Accessories', note: 'Cable trays, fire, miscellaneous' },
+  { key: 'generalCostsCivilWorks', label: 'Civil Works', note: 'Civil, structural, earthing' },
+  { key: 'others', label: 'Others', note: 'Residual line items' },
 ];
 
 export default function BOQ() {
   const { current, updateAssumptionDeep } = useProject();
   const [values, setValues] = useState({});
-  const [adders, setAdders] = useState({ vatRate: 0.075, contingencyRate: 0.20, managementRate: 0.15 });
+  const [adders, setAdders] = useState({ vatRate: 0.075, contingencyRate: 0.2, managementRate: 0.15 });
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState(null);
 
@@ -32,25 +32,40 @@ export default function BOQ() {
     }
   }, [current?._id || current?.id]);
 
-  const setVal = (k, v) => { setValues((prev) => ({ ...prev, [k]: Number(v) || 0 })); setDirty(true); };
-  const setAdd = (k, v) => { setAdders((prev) => ({ ...prev, [k]: Number(v) || 0 })); setDirty(true); };
+  const setVal = (key, value) => {
+    setValues((prev) => ({ ...prev, [key]: Number(value) || 0 }));
+    setDirty(true);
+  };
 
-  const subTotal = ROWS.slice(0, 8).reduce((s, r) => s + (values[r.key] || 0), 0);
+  const setAdd = (key, value) => {
+    setAdders((prev) => ({ ...prev, [key]: Number(value) || 0 }));
+    setDirty(true);
+  };
+
+  const subTotal = ROWS.slice(0, 8).reduce((sum, row) => sum + (values[row.key] || 0), 0);
   const vat = subTotal * (adders.vatRate || 0);
   const contingency = subTotal * (adders.contingencyRate || 0);
   const management = subTotal * (adders.managementRate || 0);
   const others = values.others || 0;
   const total = subTotal + vat + contingency + management + others;
 
-  if (!current) return <div className="text-sm text-muted">Loading…</div>;
+  if (!current) return <div className="text-sm text-[var(--text-muted)]">Loading...</div>;
 
   const onSave = async () => {
     setSaveState('saving');
     try {
-      await updateAssumptionDeep((a) => { a.boq = { ...values }; a.capexAdders = { ...adders }; return a; });
-      setSaveState('saved'); setDirty(false);
+      await updateAssumptionDeep((assumption) => {
+        assumption.boq = { ...values };
+        assumption.capexAdders = { ...adders };
+        return assumption;
+      });
+      setSaveState('saved');
+      setDirty(false);
       setTimeout(() => setSaveState(null), 2000);
-    } catch (e) { setSaveState('error'); alert(e.message); }
+    } catch (error) {
+      setSaveState('error');
+      alert(error.message);
+    }
   };
 
   const onReset = () => {
@@ -61,117 +76,122 @@ export default function BOQ() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <section className="rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface)] shadow-card">
+        <div className="border-b border-[var(--border-soft)] px-6 py-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-muted)]">BOQ</div>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-main)]"> Bill of Quantities</h1>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {saveState === 'saved' && (
+                <Badge variant="success">
+                  <CheckCircle2 size={12} className="mr-1" />
+                  Saved
+                </Badge>
+              )}
+              {saveState === 'error' && (
+                <Badge variant="danger">
+                  <AlertCircle size={12} className="mr-1" />
+                  Save failed
+                </Badge>
+              )}
+              <Button variant="outline" onClick={onReset} disabled={!dirty}>
+                <RotateCcw size={14} />
+                Reset
+              </Button>
+              <Button onClick={onSave} disabled={!dirty}>
+                <Save size={14} />
+                Save BOQ
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-0 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="min-w-0 border-b border-[var(--border-soft)] xl:border-b-0 xl:border-r">
+            <div className="overflow-auto">
+              <Table>
+                <THead>
+                  <TR>
+                    <TH className="w-16">No.</TH>
+                    <TH className="w-[280px]">Category</TH>
+                    <TH>Description</TH>
+                    <TH align="right" className="w-[180px]">Cost (NGN)</TH>
+                    <TH align="right" className="w-[110px]">Share</TH>
+                  </TR>
+                </THead>
+                <TBody>
+                  {ROWS.map((row, index) => (
+                    <TR key={row.key}>
+                      <TD className="text-[var(--text-muted)]">{index + 1}</TD>
+                      <TD className="font-medium text-[var(--text-main)]">{row.label}</TD>
+                      <TD className="text-sm text-[var(--text-muted)]">{row.note}</TD>
+                      <TD align="right" className="p-0 pr-3">
+                        <Input
+                          type="number"
+                          value={values[row.key] ?? 0}
+                          onChange={(event) => setVal(row.key, event.target.value)}
+                          className="h-11 border-transparent bg-transparent text-right hover:border-[var(--border-soft)] focus:border-accent"
+                        />
+                      </TD>
+                      <TD align="right" className="text-sm text-[var(--text-muted)]">
+                        {total > 0 ? `${(((values[row.key] || 0) / total) * 100).toFixed(1)}%` : '-'}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
+          </div>
+
+          <aside className="bg-[var(--surface-muted)] px-6 py-6">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-[var(--text-muted)]">Capex Roll-up</div>
+            <div className="mt-4 space-y-4">
+              <SummaryLine label="Sub-total" value={fmtCurrency(subTotal)} strong />
+              <AdderRow label="VAT" value={adders.vatRate} amount={vat} onChange={(value) => setAdd('vatRate', value)} />
+              <AdderRow label="Contingency" value={adders.contingencyRate} amount={contingency} onChange={(value) => setAdd('contingencyRate', value)} />
+              <AdderRow label="Management" value={adders.managementRate} amount={management} onChange={(value) => setAdd('managementRate', value)} />
+              <SummaryLine label="Others" value={fmtCurrency(others)} />
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-primary-100 bg-primary-50 px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-primary">Total Capex</div>
+              <div className="mt-2 text-3xl font-semibold text-primary">{fmtCurrency(total)}</div>
+              <p className="mt-2 text-xs leading-6 text-primary/80">
+                VAT, contingency, and management are applied to items 1 to 8, with residual items carried separately.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SummaryLine({ label, value, strong = false }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] pb-3 last:border-b-0 last:pb-0">
+      <div className={strong ? 'font-semibold text-[var(--text-main)]' : 'text-sm text-[var(--text-muted)]'}>{label}</div>
+      <div className={strong ? 'font-semibold text-[var(--text-main)]' : 'text-sm font-medium text-[var(--text-main)]'}>{value}</div>
+    </div>
+  );
+}
+
+function AdderRow({ label, value, amount, onChange }) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs text-muted uppercase tracking-wider">Capex Build-up</div>
-          <h1 className="text-2xl font-semibold text-ink">Bill of Quantities</h1>
-          <p className="text-sm text-muted mt-1">
-            Category roll-up from BOQ + 3MW Project BEME · VAT, contingency, and management apply to sub-total.
-          </p>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">{label}</div>
+          <div className="mt-1 text-sm font-medium text-[var(--text-main)]">{fmtCurrency(amount)}</div>
         </div>
-        <div className="flex items-center gap-2">
-          {saveState === 'saved' && (
-            <div className="flex items-center gap-1 text-emerald-700 text-xs bg-emerald-50 border border-emerald-100 rounded px-2 py-1">
-              <CheckCircle2 size={12} /> Saved
-            </div>
-          )}
-          {saveState === 'error' && (
-            <div className="flex items-center gap-1 text-red-700 text-xs bg-red-50 border border-red-100 rounded px-2 py-1">
-              <AlertCircle size={12} /> Failed
-            </div>
-          )}
-          <Button variant="outline" onClick={onReset} disabled={!dirty}><RotateCcw size={14} /> Reset</Button>
-          <Button onClick={onSave} disabled={!dirty}><Save size={14} /> Save BOQ</Button>
+        <div className="w-28">
+          <Input type="number" step="0.001" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 text-right" />
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Category Line Items</CardTitle>
-          <CardDescription>NGN · sub-total feeds VAT / contingency / management</CardDescription>
-        </CardHeader>
-        <Table>
-          <THead>
-            <TR>
-              <TH>#</TH>
-              <TH>Category</TH>
-              <TH>Description</TH>
-              <TH align="right">Cost (NGN)</TH>
-              <TH align="right">Share</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {ROWS.map((row, idx) => (
-              <TR key={row.key}>
-                <TD className="text-muted">{idx + 1}</TD>
-                <TD className="font-medium">{row.label}</TD>
-                <TD className="text-muted text-xs">{row.note}</TD>
-                <TD align="right" className="p-0 pr-3">
-                  <Input
-                    type="number"
-                    className="h-9 text-right border-transparent hover:border-border focus:border-accent bg-transparent"
-                    value={values[row.key] ?? 0}
-                    onChange={(e) => setVal(row.key, e.target.value)}
-                  />
-                </TD>
-                <TD align="right" className="text-muted text-xs">
-                  {total > 0 ? `${(((values[row.key] || 0) / total) * 100).toFixed(1)}%` : '—'}
-                </TD>
-              </TR>
-            ))}
-            <TR className="bg-offwhite font-semibold">
-              <TD></TD>
-              <TD>Sub-total (items 1-8)</TD>
-              <TD></TD>
-              <TD align="right">{fmtCurrency(subTotal)}</TD>
-              <TD></TD>
-            </TR>
-          </TBody>
-        </Table>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Adders</CardTitle>
-            <CardDescription>Applied to sub-total</CardDescription>
-          </CardHeader>
-          <CardBody className="space-y-3">
-            {[
-              ['vatRate', 'VAT', vat],
-              ['contingencyRate', 'Contingency', contingency],
-              ['managementRate', 'Management', management],
-            ].map(([key, label, amt]) => (
-              <div key={key} className="flex items-center gap-3">
-                <div className="w-28 text-xs text-muted uppercase tracking-wide">{label}</div>
-                <Input type="number" step="0.001" className="w-28" value={adders[key]} onChange={(e) => setAdd(key, e.target.value)} />
-                <div className="text-xs text-muted w-24">decimal</div>
-                <div className="ml-auto text-sm font-medium tabular-nums">{fmtCurrency(amt)}</div>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Capex Summary</CardTitle>
-            <CardDescription>Auto-calculated</CardDescription>
-          </CardHeader>
-          <CardBody>
-            <dl className="text-sm divide-y divide-border">
-              <div className="flex justify-between py-2"><dt className="text-muted">Sub-total</dt>   <dd className="num font-medium">{fmtCurrency(subTotal)}</dd></div>
-              <div className="flex justify-between py-2"><dt className="text-muted">VAT</dt>         <dd className="num font-medium">{fmtCurrency(vat)}</dd></div>
-              <div className="flex justify-between py-2"><dt className="text-muted">Contingency</dt> <dd className="num font-medium">{fmtCurrency(contingency)}</dd></div>
-              <div className="flex justify-between py-2"><dt className="text-muted">Management</dt>  <dd className="num font-medium">{fmtCurrency(management)}</dd></div>
-              <div className="flex justify-between py-2"><dt className="text-muted">Others</dt>      <dd className="num font-medium">{fmtCurrency(others)}</dd></div>
-              <div className="flex justify-between py-3 bg-primary-50 -mx-5 px-5 rounded mt-2">
-                <dt className="font-semibold text-primary">Total Capex</dt>
-                <dd className="num font-bold text-primary text-lg">{fmtCurrency(total)}</dd>
-              </div>
-            </dl>
-          </CardBody>
-        </Card>
-      </div>
+      <div className="mt-2 text-xs text-[var(--text-muted)]">Decimal rate applied to sub-total</div>
     </div>
   );
 }
