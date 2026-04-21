@@ -54,7 +54,7 @@ export default function Financials() {
       <Card>
         <CardHeader>
           <CardTitle>Financial Statements</CardTitle>
-          <CardDescription>Rolled up from the monthly engine.</CardDescription>
+          <CardDescription>Rolled up from the monthly calculation.</CardDescription>
         </CardHeader>
         <CardBody>
           <Tabs defaultValue="is">
