@@ -46,7 +46,6 @@ export default function Reports() {
         <h1 className="text-2xl font-semibold text-[var(--text-main)]">Reports</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">Sensitivity analysis · DSCR schedule · scenario comparison</p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Sensitivity Analysis</CardTitle>

@@ -234,6 +234,60 @@ CMD ["node", "server.js"]
 
 ---
 
+## Optional FundCo AI
+
+FundCo AI is an additive AI layer on top of the existing manual financial model. If `GROK_API_KEY` is not configured, the manual project workflow continues unchanged.
+
+### Setup
+
+1. Add the Grok API key to `backend/.env`
+2. Restart the backend
+3. Keep the key on the backend only; it is never exposed to the frontend
+
+Example:
+
+```ini
+GROK_API_KEY=your_valid_grok_api_key
+GROK_MODEL=grok-4
+```
+
+### What it adds
+
+- `Ask FundCo AI` floating button with a persistent right sidebar assistant
+- `Explain with FundCo AI` actions on dashboard KPIs, charts, and financial statement values
+- `AI Tools` in the navbar for scenario generation, model optimization suggestions, and executive summary drafting
+- `AI Insights` on the Reports page for optional commentary on sensitivity, risks, and DSCR
+
+### Important technical rule
+
+FundCo AI uses Grok only for reasoning, explanations, suggestions, and narrative generation. All financial calculations still run only through the existing JavaScript financial engine. When AI proposes scenarios or optimization changes, the backend re-runs the financial engine to produce the modeled outputs.
+
+### New AI-related files
+
+```text
+backend/
+  .env.example
+  routes/ai.js
+  services/aiService.js
+
+frontend/src/
+  components/ai/AiChatSidebar.jsx
+  components/ai/AiExplainModal.jsx
+  components/ai/AiInsightsSection.jsx
+  components/ai/AiToolsMenu.jsx
+  components/ai/ExplainTrigger.jsx
+  contexts/AiContext.jsx
+```
+
+### Integration notes for an existing codebase
+
+- Backend integration is isolated under `/api/ai/*`
+- Frontend integration is isolated under `components/ai` and `contexts/AiContext.jsx`
+- Existing manual routes, pages, exports, and calculations remain in place
+- To merge into another working copy, add the new AI files first, then wire the small shell changes in `backend/server.js`, `frontend/src/App.jsx`, `frontend/src/components/Layout.jsx`, `frontend/src/lib/api.js`, `frontend/src/pages/Dashboard.jsx`, `frontend/src/pages/Financials.jsx`, and `frontend/src/pages/Reports.jsx`
+
+---
+
 ## How the financial engine maps to the Excel
 
 ### Sheet → Module

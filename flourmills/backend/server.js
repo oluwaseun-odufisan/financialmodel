@@ -4,6 +4,7 @@ import cors from 'cors';
 import { connectDB, dbState } from './config/db.js';
 import authRouter from './routes/auth.js';
 import projectsRouter from './routes/projects.js';
+import aiRouter from './routes/ai.js';
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -21,6 +22,8 @@ async function bootstrap() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/projects', projectsRouter);
+  // AI FEATURE - GROK
+  app.use('/api/ai', aiRouter);
 
   app.use((err, _req, res, _next) => {
     console.error('[unhandled]', err);

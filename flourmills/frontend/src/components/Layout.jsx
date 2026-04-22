@@ -1,7 +1,8 @@
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
 import { useProject } from '../contexts/ProjectContext.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useAi } from '../contexts/AiContext.jsx';
 import { Badge, Button, Progress } from './ui/Primitives.jsx';
 import NewProjectModal from './NewProjectModal.jsx';
 import { api } from '../lib/api.js';
@@ -31,6 +32,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils.js';
+
+// AI FEATURE - GROK
+const AiChatSidebar = lazy(() => import('./ai/AiChatSidebar.jsx'));
 
 const navItems = [
   { to: '/', label: 'Deal Summary', short: 'Summary', icon: LayoutDashboard },
@@ -155,11 +159,11 @@ function ProjectSwitcher({ onNewProject }) {
   useOutsideClick(ref, () => setOpen(false));
 
   return (
-    <div className="relative min-w-0" ref={ref}>
+    <div className="relative min-w-0 w-full sm:w-auto" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex min-w-[240px] max-w-[360px] items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2.5 text-left hover:bg-[var(--surface-muted)]"
+        className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2.5 text-left hover:bg-[var(--surface-muted)] sm:min-w-[240px] sm:max-w-[360px]"
       >
         <div className="min-w-0 flex-1">
           <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Project</div>
@@ -277,8 +281,9 @@ function PdfExportModal({ open, onClose, onSelect, busy }) {
   );
 }
 
-function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar }) {
+function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar, compressed = false }) {
   const { current, running, runProgress, runModel } = useProject();
+  const { canUseAi, sidebarOpen, setSidebarOpen } = useAi();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [exportBusy, setExportBusy] = useState(null);
@@ -289,8 +294,7 @@ function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar }) 
   useOutsideClick(userMenuRef, () => setUserMenuOpen(false));
 
   const hasResult = !!current?.result;
-  const projectId = current ? current._id || current.id : null;
-
+  const projectId = current ? String(current._id || current.id) : null;
   const handleRun = async () => {
     try {
       await runModel();
@@ -300,7 +304,7 @@ function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar }) 
   };
 
   const handleExcel = async () => {
-    setExportBusy(' excel');
+    setExportBusy('excel');
     try {
       await api.downloadExcel(projectId, `${current.projectName.replace(/\s+/g, '_')}.xlsx`);
     } catch (error) {
@@ -326,34 +330,43 @@ function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar }) 
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-[var(--border-soft)] bg-[var(--surface)]">
-        <div className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            onClick={onOpenMobileSidebar}
-            className="inline-flex rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-2 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-main)] lg:hidden"
-          >
-            <Menu size={18} />
-          </button>
-
-          <ProjectSwitcher onNewProject={onNewProject} />
-
-          {current && (
-            hasResult ? (
-              <Badge variant="success" className="hidden md:inline-flex">
-                <CheckCircle2 size={11} className="mr-1" />
-                Run complete
-              </Badge>
-            ) : (
-              <Badge variant="warning" className="hidden md:inline-flex">
-                <AlertCircle size={11} className="mr-1" />
-                Awaiting run
-              </Badge>
-            )
+        <div
+          className={cn(
+            'grid gap-3 px-4 py-3 sm:px-6 lg:px-8',
+            compressed ? '2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center' : 'xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center'
           )}
+        >
+          <div className="flex min-w-0 items-center gap-3 lg:flex-1">
+            <button
+              type="button"
+              onClick={onOpenMobileSidebar}
+              className="inline-flex rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-2 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text-main)] lg:hidden"
+            >
+              <Menu size={18} />
+            </button>
 
-          <div className="ml-auto flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ProjectSwitcher onNewProject={onNewProject} />
+            </div>
+
+            {current && (
+              hasResult ? (
+                <Badge variant="success" className={cn('hidden', compressed ? '2xl:inline-flex' : 'xl:inline-flex')}>
+                  <CheckCircle2 size={11} className="mr-1" />
+                  Run complete
+                </Badge>
+              ) : (
+                <Badge variant="warning" className={cn('hidden', compressed ? '2xl:inline-flex' : 'xl:inline-flex')}>
+                  <AlertCircle size={11} className="mr-1" />
+                  Awaiting run
+                </Badge>
+              )
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
             {running && (
-              <div className="hidden min-w-[210px] items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-2 md:flex">
+              <div className={cn('hidden min-w-[210px] items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-3 py-2', compressed ? '2xl:flex' : 'md:flex')}>
                 <Progress value={runProgress} className="flex-1" />
                 <span className="text-xs text-[var(--text-muted)]">{runProgress}%</span>
               </div>
@@ -368,14 +381,24 @@ function AppNavbar({ onNewProject, theme, onToggleTheme, onOpenMobileSidebar }) 
               <>
                 <Button variant="outline" onClick={handleExcel} disabled={!!exportBusy} className="hidden lg:inline-flex">
                   <FileSpreadsheet size={16} />
-                  Export Excel
+                  <span className={cn(compressed ? 'hidden 2xl:inline' : 'hidden xl:inline')}>Export Excel</span>
                 </Button>
                 <Button variant="outline" onClick={() => setPdfModalOpen(true)} disabled={!!exportBusy} className="hidden lg:inline-flex">
                   <FileText size={16} />
-                  Export PDF
+                  <span className={cn(compressed ? 'hidden 2xl:inline' : 'hidden xl:inline')}>Export PDF</span>
                 </Button>
               </>
             )}
+
+            <Button
+              variant="outline"
+              onClick={() => setSidebarOpen((value) => !value)}
+              disabled={!canUseAi}
+              className="inline-flex"
+            >
+              <span className={cn('sm:hidden', compressed && 'lg:hidden')}>{sidebarOpen ? 'Close AI' : 'FundCo AI'}</span>
+              <span className={cn('hidden sm:inline', compressed ? '2xl:inline' : 'xl:inline')}>{sidebarOpen ? 'Close FundCo AI' : 'FundCo AI'}</span>
+            </Button>
 
             <Button onClick={handleRun} disabled={running || !current}>
               <Play size={16} />
@@ -434,6 +457,7 @@ export default function Layout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === 'true');
   const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY) || 'light');
+  const { sidebarOpen } = useAi();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -461,6 +485,7 @@ export default function Layout() {
           theme={theme}
           onToggleTheme={() => setTheme((value) => (value === 'dark' ? 'light' : 'dark'))}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+          compressed={sidebarOpen}
         />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8">
@@ -468,6 +493,12 @@ export default function Layout() {
           </div>
         </main>
       </div>
+
+      <div className={cn('hidden lg:block', sidebarOpen ? 'w-[380px]' : 'w-0')} aria-hidden="true" />
+
+      <Suspense fallback={null}>
+        <AiChatSidebar />
+      </Suspense>
 
       <NewProjectModal open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
     </div>

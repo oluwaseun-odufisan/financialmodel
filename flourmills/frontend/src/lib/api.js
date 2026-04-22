@@ -96,4 +96,41 @@ export const api = {
     a.click();
     URL.revokeObjectURL(downloadUrl);
   },
+
+  // AI FEATURE - GROK
+  aiChat: (projectId, question, history = []) =>
+    request('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ projectId, question, history }),
+    }),
+  // AI FEATURE - GROK
+  aiExplain: (projectId, target) =>
+    request('/api/ai/explain', {
+      method: 'POST',
+      body: JSON.stringify({ projectId, target }),
+    }),
+  // AI FEATURE - GROK
+  aiGenerateScenarios: (projectId) =>
+    request('/api/ai/scenarios', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    }),
+  // AI FEATURE - GROK
+  aiOptimizeModel: (projectId, goal) =>
+    request('/api/ai/optimize', {
+      method: 'POST',
+      body: JSON.stringify({ projectId, goal }),
+    }),
+  // AI FEATURE - GROK
+  aiGenerateSummary: (projectId) =>
+    request('/api/ai/summary', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    }),
+  // AI FEATURE - GROK
+  aiGenerateInsights: (projectId) =>
+    request('/api/ai/insights', {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    }),
 };

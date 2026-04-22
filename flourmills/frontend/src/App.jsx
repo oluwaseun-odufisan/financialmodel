@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { useProject } from './contexts/ProjectContext.jsx';
+import { AiProvider } from './contexts/AiContext.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Projects from './pages/Projects.jsx';
@@ -11,6 +12,7 @@ import MonthlyCalc from './pages/MonthlyCalc.jsx';
 import Depreciation from './pages/Depreciation.jsx';
 import Financials from './pages/Financials.jsx';
 import Reports from './pages/Reports.jsx';
+import AiAnalysis from './pages/AiAnalysis.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -37,7 +39,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route element={<Protected><Layout /></Protected>}>
+      {/* AI FEATURE - GROK */}
+      <Route element={<Protected><AiProvider><Layout /></AiProvider></Protected>}>
         <Route path="/projects" element={<Projects />} />
         <Route path="/"             element={<RequireProject><Dashboard /></RequireProject>} />
         <Route path="/assumptions"  element={<RequireProject><Assumptions /></RequireProject>} />
@@ -46,6 +49,7 @@ export default function App() {
         <Route path="/depreciation" element={<RequireProject><Depreciation /></RequireProject>} />
         <Route path="/financials"   element={<RequireProject><Financials /></RequireProject>} />
         <Route path="/reports"      element={<RequireProject><Reports /></RequireProject>} />
+        <Route path="/ai-analysis"  element={<RequireProject><AiAnalysis /></RequireProject>} />
         <Route path="*"             element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
