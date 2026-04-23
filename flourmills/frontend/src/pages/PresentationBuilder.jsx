@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Clock3, Download, Eye, Loader2, PencilLine, Presentation, RefreshCw, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, Loader2, Maximize2, Minus, PencilLine, Plus, Presentation, RefreshCw } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext.jsx';
 import { api } from '../lib/api.js';
 import { cn, fmtMillions, fmtMultiplier, fmtNumber, fmtPct } from '../lib/utils.js';
@@ -14,6 +14,37 @@ const DEFAULT_PRESETS = [
 ];
 
 const AUDIENCES = ['Investment Committee', 'Board Review', 'Lender Submission', 'Management Review', 'Client Proposal'];
+const SLIDE_WIDTH = 1280;
+const SLIDE_HEIGHT = 720;
+
+function useElementSize() {
+  const ref = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+
+    const update = () => {
+      setSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+
+    update();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(element);
+    window.addEventListener('resize', update);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  return [ref, size];
+}
 
 function friendlyPresentationError(error) {
   if (error?.status === 404 || /404/.test(error?.message || '')) {
@@ -90,20 +121,19 @@ function PresetCard({ preset, selected, onSelect }) {
 
 function HistoryList({ history, activeId, busy, onRefresh, onOpen }) {
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] px-6 py-4">
+    <div className="border-t border-[var(--border-soft)]">
+      <div className="flex items-center justify-between gap-3 px-5 py-4">
         <div>
-          <h2 className="text-base font-semibold text-[var(--text-main)]">Presentation History</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Reopen previous drafts and exported versions.</p>
+          <h2 className="text-sm font-semibold text-[var(--text-main)]">History</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Reopen previous drafts.</p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={busy}>
           {busy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          Refresh
         </Button>
       </div>
       <div className="max-h-[360px] overflow-auto">
         {history.length === 0 && (
-          <div className="px-6 py-7 text-sm leading-6 text-[var(--text-muted)]">
+          <div className="px-5 py-6 text-sm leading-6 text-[var(--text-muted)]">
             No presentation history yet. Generated drafts will be saved here for quick access.
           </div>
         )}
@@ -113,21 +143,19 @@ function HistoryList({ history, activeId, busy, onRefresh, onOpen }) {
             type="button"
             onClick={() => onOpen(item)}
             className={cn(
-              'flex w-full items-start justify-between gap-4 border-b border-[var(--border-soft)] px-6 py-4 text-left last:border-b-0 hover:bg-[var(--surface-muted)]',
+              'flex w-full items-start justify-between gap-4 border-t border-[var(--border-soft)] px-5 py-3 text-left hover:bg-[var(--surface-muted)]',
               activeId === item.id && 'bg-primary-50'
             )}
           >
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-[var(--text-main)]">{item.title}</div>
+              <div className="truncate text-xs font-semibold text-[var(--text-main)]">{item.title}</div>
               <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
                 <span>{item.presetName}</span>
-                <span>{item.audience}</span>
                 <span>{item.slideCount} slides</span>
               </div>
             </div>
             <div className="shrink-0 text-right">
               <Badge variant={item.status === 'exported' ? 'success' : 'neutral'}>{item.status}</Badge>
-              <div className="mt-2 text-[11px] text-[var(--text-muted)]">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</div>
             </div>
           </button>
         ))}
@@ -141,11 +169,11 @@ function SlideEditor({ slide, index, onChange }) {
   const update = (patch) => onChange({ ...slide, ...patch });
 
   return (
-    <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
-      <div className="flex flex-col gap-3 border-b border-[var(--border-soft)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="border-t border-[var(--border-soft)] bg-[var(--surface)]">
+      <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">Slide {index + 1}</div>
-          <div className="mt-1 truncate text-sm font-semibold text-[var(--text-main)]">{slide.title}</div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">Edit Slide {index + 1}</div>
+          <div className="mt-1 truncate text-base font-semibold text-[var(--text-main)]">{slide.title}</div>
         </div>
         <label className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <input
@@ -157,7 +185,7 @@ function SlideEditor({ slide, index, onChange }) {
           Include
         </label>
       </div>
-      <div className="grid gap-4 px-5 py-5 lg:grid-cols-2">
+      <div className="grid gap-4 px-5 pb-5 lg:grid-cols-2">
         <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Title</span>
           <input
@@ -317,8 +345,8 @@ function SlidePreview({ slide, index, current, preset }) {
   const renderContent = () => {
     if (slide.type === 'cover') {
       return (
-        <div className="grid min-h-[560px] grid-cols-[38%_1fr]">
-          <div className="flex min-h-[560px] flex-col justify-between px-10 py-10 text-white" style={{ background: colors.primary }}>
+        <div className="grid h-full grid-cols-[38%_1fr]">
+          <div className="flex h-full flex-col justify-between px-10 py-10 text-white" style={{ background: colors.primary }}>
             <div>
               <div className="text-xs font-bold uppercase tracking-[0.2em] opacity-80">Project Finance Model</div>
               <h2 className="mt-8 text-[34px] font-semibold leading-tight">{trimCopy(slide.title, 70)}</h2>
@@ -402,8 +430,8 @@ function SlidePreview({ slide, index, current, preset }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl rounded-[28px] border bg-white shadow-2xl" style={{ borderColor: colors.line }}>
-      <div className="flex min-h-[560px] flex-col" style={{ background: colors.bg }}>
+    <div className="h-[720px] w-[1280px] overflow-hidden rounded-[20px] border bg-white shadow-2xl" style={{ borderColor: colors.line }}>
+      <div className="flex h-full flex-col" style={{ background: colors.bg }}>
         {slide.type !== 'cover' && (
           <div className="flex items-center justify-between px-10 py-5 text-[11px] font-semibold" style={{ color: colors.muted }}>
             <span>{projectName}</span>
@@ -433,19 +461,21 @@ function SlidePreview({ slide, index, current, preset }) {
 
 function SlideNavigator({ slides, activeIndex, onSelect }) {
   return (
-    <div className="flex gap-2 overflow-auto pb-2">
+    <div className="flex gap-2 overflow-auto border-b border-[var(--border-soft)] px-4 py-3">
       {slides.map((slide, index) => (
         <button
           key={`${slide.id}-${index}`}
           type="button"
           onClick={() => onSelect(index)}
           className={cn(
-            'min-w-[150px] rounded-2xl border px-3 py-3 text-left transition-colors',
-            activeIndex === index ? 'border-primary bg-primary-50' : 'border-[var(--border-soft)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]'
+            'min-w-[142px] border-l-2 px-3 py-2 text-left transition-colors',
+            activeIndex === index ? 'border-l-primary bg-primary-50' : 'border-l-[var(--border-soft)] hover:bg-[var(--surface-muted)]',
+            slide.included === false && 'opacity-50'
           )}
         >
           <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">Slide {index + 1}</div>
           <div className="mt-1 truncate text-xs font-semibold text-[var(--text-main)]">{slide.title}</div>
+          {slide.included === false && <div className="mt-1 text-[10px] text-[var(--text-muted)]">Excluded</div>}
         </button>
       ))}
     </div>
@@ -461,14 +491,23 @@ export default function PresentationBuilder() {
   const [history, setHistory] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [zoom, setZoom] = useState('fit');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState(null);
+  const [previewRef, previewSize] = useElementSize();
   const projectId = current ? String(current._id || current.id) : null;
   const kpis = current?.result?.kpis || {};
+  const workspaceSlides = draft?.slides || [];
   const includedSlides = useMemo(() => (draft?.slides || []).filter((slide) => slide.included !== false), [draft]);
-  const previewSlideIndex = Math.min(activeSlideIndex, Math.max(includedSlides.length - 1, 0));
+  const previewSlideIndex = Math.min(activeSlideIndex, Math.max(workspaceSlides.length - 1, 0));
+  const activeSlide = workspaceSlides[previewSlideIndex] || null;
+  const fitScale = useMemo(() => {
+    if (!previewSize.width || !previewSize.height) return 0.58;
+    return Math.max(0.28, Math.min((previewSize.width - 48) / SLIDE_WIDTH, (previewSize.height - 48) / SLIDE_HEIGHT, 1));
+  }, [previewSize.height, previewSize.width]);
+  const previewScale = zoom === 'fit' ? fitScale : zoom;
+  const zoomLabel = zoom === 'fit' ? 'Fit' : `${Math.round(previewScale * 100)}%`;
   const selectedPreset = useMemo(
     () => presets.find((preset) => preset.id === presetId) || draft?.preset || DEFAULT_PRESETS[0],
     [draft?.preset, presetId, presets]
@@ -500,10 +539,10 @@ export default function PresentationBuilder() {
   }, [projectId]);
 
   useEffect(() => {
-    if (activeSlideIndex >= includedSlides.length) {
-      setActiveSlideIndex(Math.max(includedSlides.length - 1, 0));
+    if (activeSlideIndex >= workspaceSlides.length) {
+      setActiveSlideIndex(Math.max(workspaceSlides.length - 1, 0));
     }
-  }, [activeSlideIndex, includedSlides.length]);
+  }, [activeSlideIndex, workspaceSlides.length]);
 
   const generateDraft = async () => {
     if (!projectId) return;
@@ -520,7 +559,7 @@ export default function PresentationBuilder() {
         slides: (response.draft?.slides || []).map((slide) => ({ ...slide, included: slide.included !== false })),
       });
       setActiveSlideIndex(0);
-      setPreviewOpen(true);
+      setZoom('fit');
       if (response.history) {
         setActiveHistoryId(response.history.id);
         setHistory((prev) => [response.history, ...prev.filter((item) => item.id !== response.history.id)]);
@@ -571,7 +610,7 @@ export default function PresentationBuilder() {
       setAudience(historyItem.audience || historyItem.draft?.audience || audience);
       setActiveHistoryId(historyItem.id);
       setActiveSlideIndex(0);
-      setPreviewOpen(true);
+      setZoom('fit');
     } catch (err) {
       setError(friendlyPresentationError(err));
     } finally {
@@ -586,6 +625,21 @@ export default function PresentationBuilder() {
     }));
   };
 
+  const changeZoom = (direction) => {
+    setZoom((currentZoom) => {
+      const currentScale = currentZoom === 'fit' ? fitScale : currentZoom;
+      const next = direction === 'in' ? currentScale + 0.1 : currentScale - 0.1;
+      return Math.min(1.4, Math.max(0.35, Number(next.toFixed(2))));
+    });
+  };
+
+  const goToSlide = (direction) => {
+    setActiveSlideIndex((currentIndex) => {
+      const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+      return Math.min(Math.max(nextIndex, 0), Math.max(workspaceSlides.length - 1, 0));
+    });
+  };
+
   if (!current?.result) {
     return (
       <Section>
@@ -597,132 +651,181 @@ export default function PresentationBuilder() {
   }
 
   return (
-    <div className="space-y-6">
-      <Section>
-        <HeaderBlock
-          title="AI-Assisted PowerPoint Presentation"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={generateDraft} disabled={busy === 'draft'}>
-                {busy === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                {draft ? 'Regenerate Draft' : 'Generate Draft'}
-              </Button>
-              <Button type="button" onClick={exportDeck} disabled={!draft || busy === 'export'}>
-                {busy === 'export' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                Export PPTX
-              </Button>
+    <div className="space-y-5">
+      <div className="border-b border-[var(--border-soft)] pb-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Generate Presentation</div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-main)]">AI-Assisted PowerPoint Presentation</h1>
+            <p className="mt-2 text-sm leading-7 text-[var(--text-muted)]">
+              Build, review, edit, and export a project finance presentation from the current model run.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={generateDraft} disabled={busy === 'draft'}>
+              {busy === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              {draft ? 'Regenerate Draft' : 'Generate Draft'}
+            </Button>
+            <Button type="button" onClick={exportDeck} disabled={!draft || busy === 'export'}>
+              {busy === 'export' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Export PPTX
+            </Button>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-px overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--border-soft)] sm:grid-cols-2 xl:grid-cols-6">
+          {[
+            { label: 'Total Capex', value: fmtMillions(kpis.totalCapex, 1) },
+            { label: 'Target Tariff', value: `NGN ${fmtNumber(kpis.targetTariff, 2)}` },
+            { label: 'Project IRR', value: fmtPct(kpis.projectIRR, 1) },
+            { label: 'Equity IRR', value: fmtPct(kpis.equityIRR, 1) },
+            { label: 'Average DSCR', value: fmtMultiplier(kpis.avgDSCR) },
+            { label: 'Project NPV', value: fmtMillions(kpis.projectNPV, 1) },
+          ].map((item) => (
+            <div key={item.label} className="bg-[var(--surface)] px-4 py-3">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">{item.label}</div>
+              <div className="mt-1 truncate text-sm font-semibold text-[var(--text-main)]">{item.value}</div>
             </div>
-          }
-        />
-        <KpiStrip kpis={kpis} />
-      </Section>
+          ))}
+        </div>
+      </div>
 
       {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>}
 
-      <div className="grid gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Section className="overflow-hidden">
-            <div className="border-b border-[var(--border-soft)] px-6 py-5">
-              <h2 className="text-lg font-semibold text-[var(--text-main)]">Presentation Settings</h2>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Choose the audience and visual style before generating the draft.</p>
-            </div>
-            <div className="space-y-5 px-6 py-5">
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Audience</span>
-                <select
-                  value={audience}
-                  onChange={(event) => setAudience(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 text-sm text-[var(--text-main)] outline-none"
-                >
-                  {AUDIENCES.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </label>
+      <div className="grid overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface)] xl:min-h-[calc(100vh-250px)] xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="border-b border-[var(--border-soft)] bg-[var(--surface)] xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border-soft)] px-5 py-5">
+            <h2 className="text-base font-semibold text-[var(--text-main)]">Setup</h2>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Choose the audience and visual direction before drafting.</p>
+          </div>
+          <div className="space-y-5 px-5 py-5">
+            <label className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Audience</span>
+              <select
+                value={audience}
+                onChange={(event) => setAudience(event.target.value)}
+                className="h-11 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 text-sm text-[var(--text-main)] outline-none"
+              >
+                {AUDIENCES.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Design Preset</div>
               <div className="overflow-hidden rounded-2xl border border-[var(--border-soft)]">
                 {presets.map((preset) => (
                   <PresetCard key={preset.id} preset={preset} selected={presetId === preset.id} onSelect={setPresetId} />
                 ))}
               </div>
             </div>
-          </Section>
+          </div>
+          <HistoryList history={history} activeId={activeHistoryId} busy={historyBusy || busy === 'history'} onRefresh={loadHistory} onOpen={openHistory} />
+        </aside>
 
-          <Section className="overflow-hidden">
-            <HistoryList history={history} activeId={activeHistoryId} busy={historyBusy || busy === 'history'} onRefresh={loadHistory} onOpen={openHistory} />
-          </Section>
-        </div>
-
-        <div className="space-y-6">
-          <Section>
-            <div className="flex flex-col gap-3 border-b border-[var(--border-soft)] px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--text-main)]">Deck Structure</h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  {draft ? `${includedSlides.length} slides selected for export.` : 'Generate a draft to edit the presentation structure.'}
-                </p>
-              </div>
-              {draft && (
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant={previewOpen ? 'outline' : 'primary'} size="sm" onClick={() => setPreviewOpen((open) => !open)}>
-                    {previewOpen ? <X size={14} /> : <Eye size={14} />}
-                    {previewOpen ? 'Exit Preview' : 'View Deck'}
-                  </Button>
-                  <Badge variant={draft.aiAssisted ? 'success' : 'warning'}>{draft.aiAssisted ? 'AI assisted' : 'Standard fallback'}</Badge>
-                  <Badge variant="neutral">{draft.preset?.name || presets.find((preset) => preset.id === presetId)?.name}</Badge>
-                  <Badge variant="neutral"><Clock3 size={11} className="mr-1" />History saved</Badge>
-                </div>
-              )}
+        <main className="min-w-0">
+          <div className="flex flex-col gap-3 border-b border-[var(--border-soft)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-main)]">Review Workspace</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {draft ? `${includedSlides.length} slides selected for export. Select a slide, review it, then edit the active slide.` : 'Generate a draft to open the slide viewer and editor.'}
+              </p>
             </div>
+            {draft && (
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={draft.aiAssisted ? 'success' : 'warning'}>{draft.aiAssisted ? 'AI assisted' : 'Standard fallback'}</Badge>
+                <Badge variant="neutral">{selectedPreset?.name}</Badge>
+              </div>
+            )}
+          </div>
 
-            {!draft ? (
-              <div className="px-6 py-12 text-center">
+          {!draft ? (
+            <div className="flex min-h-[520px] items-center justify-center px-6 py-12 text-center">
+              <div>
                 <Presentation size={36} className="mx-auto text-primary" />
                 <h3 className="mt-4 text-xl font-semibold text-[var(--text-main)]">No presentation draft yet</h3>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-[var(--text-muted)]">
-                  Generate a draft to create a complete project finance presentation with charts, KPI pages, scenario analysis, risks, recommendations, and an appendix.
+                  Generate a draft to create the slide sequence, preview, and editable content panel.
                 </p>
                 <Button type="button" onClick={generateDraft} disabled={busy === 'draft'} className="mt-6">
                   {busy === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <PencilLine size={16} />}
                   Generate Presentation Draft
                 </Button>
               </div>
-            ) : (
-              <div className="space-y-4 px-6 py-5">
-                {previewOpen && includedSlides.length > 0 && (
-                  <div className="rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-muted)] p-4 sm:p-6">
-                    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <h3 className="text-base font-semibold text-[var(--text-main)]">Presentation Preview</h3>
-                        <p className="mt-1 text-xs text-[var(--text-muted)]">Review the deck inside the application before exporting. Use the editors below to change slide text.</p>
-                      </div>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setPreviewOpen(false)}>
-                        <X size={14} />
-                        Exit Preview
+            </div>
+          ) : (
+            <>
+              <SlideNavigator slides={workspaceSlides} activeIndex={previewSlideIndex} onSelect={setActiveSlideIndex} />
+              <div>
+                <section className="min-w-0 border-b border-[var(--border-soft)]">
+                  <div className="flex flex-col gap-3 border-b border-[var(--border-soft)] px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--text-main)]">{activeSlide?.title}</div>
+                      <div className="mt-1 text-xs text-[var(--text-muted)]">Slide {previewSlideIndex + 1} of {workspaceSlides.length}</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => goToSlide('previous')} disabled={previewSlideIndex <= 0}>
+                        <ChevronLeft size={14} />
                       </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => goToSlide('next')} disabled={previewSlideIndex >= workspaceSlides.length - 1}>
+                        <ChevronRight size={14} />
+                      </Button>
+                      <span className="mx-1 hidden h-5 w-px bg-[var(--border-soft)] sm:block" />
+                      <Button type="button" variant="outline" size="sm" onClick={() => changeZoom('out')}>
+                        <Minus size={14} />
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setZoom('fit')}>
+                        <Maximize2 size={14} />
+                        Fit
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => changeZoom('in')}>
+                        <Plus size={14} />
+                      </Button>
+                      <span className="min-w-[52px] text-right text-xs font-semibold text-[var(--text-muted)]">{zoomLabel}</span>
                     </div>
-                    <SlideNavigator slides={includedSlides} activeIndex={previewSlideIndex} onSelect={setActiveSlideIndex} />
-                    <div className="mt-5 max-h-[78vh] overflow-x-auto overflow-y-auto rounded-[24px] bg-[var(--surface)] p-3 pb-5">
-                      <div className="min-w-[860px]">
-                        <SlidePreview slide={includedSlides[previewSlideIndex]} index={previewSlideIndex} current={current} preset={selectedPreset} />
+                  </div>
+                  <div ref={previewRef} className="h-[clamp(500px,calc(100vh-360px),820px)] overflow-auto bg-[var(--surface-muted)] p-6">
+                    {activeSlide && (
+                      <div
+                        className="mx-auto"
+                        style={{
+                          width: `${SLIDE_WIDTH * previewScale}px`,
+                          height: `${SLIDE_HEIGHT * previewScale}px`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: SLIDE_WIDTH,
+                            height: SLIDE_HEIGHT,
+                            transform: `scale(${previewScale})`,
+                            transformOrigin: 'top left',
+                          }}
+                        >
+                          <SlidePreview slide={activeSlide} index={previewSlideIndex} current={current} preset={selectedPreset} />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                )}
-                {draft.slides.map((slide, index) => (
-                  <SlideEditor key={slide.id} slide={slide} index={index} onChange={(nextSlide) => updateSlide(index, nextSlide)} />
-                ))}
-                <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-[var(--text-main)]">Need a fresh version?</h3>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Regenerate the draft using the selected audience, preset, and latest model result.</p>
+                </section>
+
+                <section className="min-w-0">
+                  {activeSlide && (
+                    <SlideEditor
+                      slide={activeSlide}
+                      index={previewSlideIndex}
+                      onChange={(nextSlide) => updateSlide(previewSlideIndex, nextSlide)}
+                    />
+                  )}
+                  <div className="border-t border-[var(--border-soft)] px-5 py-4">
+                    <div className="text-sm font-semibold text-[var(--text-main)]">Need a fresh version?</div>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Regenerate from the selected audience, preset, and latest model result.</p>
+                    <Button type="button" variant="outline" onClick={generateDraft} disabled={busy === 'draft'} className="mt-4 w-full">
+                      {busy === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                      Regenerate Draft
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" onClick={generateDraft} disabled={busy === 'draft'} className="shrink-0">
-                    {busy === 'draft' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    Regenerate Draft
-                  </Button>
-                </div>
+                </section>
               </div>
-            )}
-          </Section>
-        </div>
+            </>
+          )}
+        </main>
       </div>
     </div>
   );
