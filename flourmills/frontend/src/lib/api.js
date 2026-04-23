@@ -32,11 +32,19 @@ async function request(path, options = {}) {
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) {
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok) {
+      const error = new Error(data.error || `Request failed (${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
     return data;
   }
 
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(`Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
   return res;
 }
 
@@ -133,4 +141,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ projectId }),
     }),
+  // AI FEATURE - GROK
+  aiListHistory: (projectId, limit = 40, type = '') => {
+    const params = new URLSearchParams({ projectId, limit: String(limit) });
+    if (type) params.set('type', type);
+    return request(`/api/ai/history?${params.toString()}`).catch((error) => {
+      if (error.status === 404) return { history: [], unavailable: true };
+      throw error;
+    });
+  },
+  // AI FEATURE - GROK
+  aiGetHistory: (historyId) => request(`/api/ai/history/${historyId}`),
 };

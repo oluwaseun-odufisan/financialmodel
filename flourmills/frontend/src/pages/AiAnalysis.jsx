@@ -65,6 +65,8 @@ const TYPE_META = {
   },
 };
 
+const HISTORY_TYPES = ['summary', 'scenarios', 'optimize', 'insights'];
+
 function Surface({ className, children }) {
   return <section className={cn('rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface)]', className)}>{children}</section>;
 }
@@ -134,6 +136,53 @@ function ArtifactTabs({ activeType, availableTypes, onSelect }) {
         </button>
       ))}
     </div>
+  );
+}
+
+function HistoryRail({ history, activeHistoryId, busy, onOpen }) {
+  const items = history.filter((item) => HISTORY_TYPES.includes(item.type)).slice(0, 8);
+  if (busy && items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--text-muted)]">
+        Loading saved AI history...
+      </div>
+    );
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <Surface>
+      <SectionHeader title="Saved AI History" description="Open previous FundCo AI outputs for quick review and comparison." />
+      <div className="grid gap-3 px-6 py-5 sm:grid-cols-2 xl:grid-cols-4 lg:px-8">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onOpen(item)}
+            className={cn(
+              'rounded-2xl border px-4 py-4 text-left transition-colors',
+              activeHistoryId === item.id
+                ? 'border-primary bg-primary-50'
+                : 'border-[var(--border-soft)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]'
+            )}
+          >
+            <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">{TYPE_META[item.type]?.label || item.type}</div>
+            <div className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--text-main)]">{item.title}</div>
+            <div className="mt-2 text-xs text-[var(--text-muted)]">{item.savedAt ? new Date(item.savedAt).toLocaleString() : ''}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-2 py-2">
+                <div className="text-[9px] uppercase tracking-[0.12em] text-[var(--text-muted)]">IRR</div>
+                <div className="mt-1 text-xs font-semibold text-[var(--text-main)]">{fmtPct(item.metrics?.projectIRR, 1)}</div>
+              </div>
+              <div className="rounded-lg bg-[var(--surface-muted)] px-2 py-2">
+                <div className="text-[9px] uppercase tracking-[0.12em] text-[var(--text-muted)]">DSCR</div>
+                <div className="mt-1 text-xs font-semibold text-[var(--text-main)]">{fmtMultiplier(item.metrics?.avgDSCR)}</div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </Surface>
   );
 }
 
@@ -585,13 +634,44 @@ function InsightsView({ artifact }) {
 
 export default function AiAnalysis() {
   const { current } = useProject();
-  const { sidebarOpen, setSidebarOpen, availableArtifactTypes, getArtifact, lastArtifactType, setLastArtifactType } = useAi();
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    availableArtifactTypes,
+    getArtifact,
+    lastArtifactType,
+    setLastArtifactType,
+    history,
+    historyBusy,
+    loadHistory,
+    openHistoryItem,
+  } = useAi();
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const requestedType = searchParams.get('type');
+  const requestedHistoryId = searchParams.get('historyId');
   const activeType = availableArtifactTypes.includes(requestedType) ? requestedType : lastArtifactType;
   const artifact = activeType ? getArtifact(activeType) : null;
+
+  useEffect(() => {
+    if (!current) return;
+    loadHistory({ force: false });
+  }, [current, loadHistory]);
+
+  useEffect(() => {
+    if (!requestedHistoryId) return;
+    openHistoryItem(requestedHistoryId);
+  }, [openHistoryItem, requestedHistoryId]);
+
+  useEffect(() => {
+    if (artifact || historyBusy || requestedHistoryId) return;
+    const latest = history.find((item) => HISTORY_TYPES.includes(item.type));
+    if (!latest) return;
+    openHistoryItem(latest.id).then((item) => {
+      if (item) navigate(`/ai-analysis?type=${encodeURIComponent(item.type)}&historyId=${encodeURIComponent(item.id)}`, { replace: true });
+    });
+  }, [artifact, history, historyBusy, navigate, openHistoryItem, requestedHistoryId]);
 
   useEffect(() => {
     if (!activeType && availableArtifactTypes.length > 0) {
@@ -611,10 +691,21 @@ export default function AiAnalysis() {
     navigate(`/ai-analysis?type=${encodeURIComponent(type)}`);
   };
 
+  const handleOpenHistory = async (item) => {
+    const opened = await openHistoryItem(item.id);
+    if (!opened) return;
+    navigate(`/ai-analysis?type=${encodeURIComponent(opened.type)}&historyId=${encodeURIComponent(opened.id)}`);
+  };
+
   const meta = TYPE_META[activeType] || TYPE_META.summary;
 
   if (!artifact) {
-    return <EmptyAnalysisState onOpenAi={() => setSidebarOpen(true)} />;
+    return (
+      <div className="space-y-6">
+        <EmptyAnalysisState onOpenAi={() => setSidebarOpen(true)} />
+        <HistoryRail history={history} activeHistoryId={requestedHistoryId} busy={historyBusy} onOpen={handleOpenHistory} />
+      </div>
+    );
   }
 
   return (
@@ -639,6 +730,8 @@ export default function AiAnalysis() {
           <ArtifactTabs activeType={activeType} availableTypes={availableArtifactTypes} onSelect={handleSelectType} />
         </div>
       </Surface>
+
+      <HistoryRail history={history} activeHistoryId={artifact.historyId || requestedHistoryId} busy={historyBusy} onOpen={handleOpenHistory} />
 
       {activeType === 'summary' && <ExecutiveSummaryView artifact={artifact} current={current} />}
       {activeType === 'scenarios' && <ScenarioAnalysisView artifact={artifact} />}

@@ -16,6 +16,15 @@ const TOOL_KEYS = {
   summary: 'summary',
 };
 
+const TYPE_LABELS = {
+  summary: 'Executive Summary',
+  scenarios: 'Scenario Pack',
+  optimize: 'Optimization',
+  insights: 'Insights',
+  explain: 'Explanation',
+  chat: 'Chat',
+};
+
 function ChatBubble({ role, content }) {
   const assistant = role === 'assistant';
   return (
@@ -46,6 +55,107 @@ function MetricList({ items }) {
           <div className="mt-2 text-sm font-semibold text-[var(--text-main)]">{item.value}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function HistoryMetricStrip({ metrics }) {
+  if (!metrics) return null;
+  const items = [
+    { label: 'Project IRR', value: metrics.projectIRR === null || metrics.projectIRR === undefined ? '-' : fmtPct(metrics.projectIRR, 1) },
+    { label: 'Avg DSCR', value: metrics.avgDSCR === null || metrics.avgDSCR === undefined ? '-' : fmtMultiplier(metrics.avgDSCR) },
+    { label: 'Tariff', value: metrics.targetTariff === null || metrics.targetTariff === undefined ? '-' : `NGN ${fmtNumber(metrics.targetTariff, 2)}` },
+  ];
+
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2">
+      {items.map((item) => (
+        <div key={item.label} className="rounded-lg bg-[var(--surface-muted)] px-2 py-2">
+          <div className="text-[9px] uppercase tracking-[0.14em] text-[var(--text-muted)]">{item.label}</div>
+          <div className="mt-1 truncate text-xs font-semibold text-[var(--text-main)]">{item.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HistoryComparison({ history }) {
+  const comparable = history
+    .filter((item) => ['summary', 'scenarios', 'optimize', 'insights'].includes(item.type))
+    .slice(0, 4)
+    .reverse();
+
+  if (comparable.length < 2) return null;
+
+  return (
+    <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-muted)] px-4 py-4">
+      <div className="text-sm font-semibold text-[var(--text-main)]">Recent comparison</div>
+      <div className="mt-3 space-y-3">
+        {comparable.map((item) => (
+          <div key={item.id} className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold text-[var(--text-main)]">{item.title}</div>
+                <div className="mt-1 text-[11px] text-[var(--text-muted)]">{TYPE_LABELS[item.type] || item.type}</div>
+              </div>
+              <div className="text-right text-xs font-semibold text-primary">{fmtMultiplier(item.metrics?.avgDSCR)}</div>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-strong)]">
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${Math.min(100, Math.max(8, (Number(item.metrics?.avgDSCR || 0) / 3) * 100))}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HistoryPanel({ history, historyBusy, historyError, onRefresh, onOpen }) {
+  const visibleHistory = history.filter((item) => ['summary', 'scenarios', 'optimize', 'insights'].includes(item.type));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-[var(--text-main)]">AI history</div>
+          <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Recent FundCo AI outputs for this project.</div>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={historyBusy}>
+          Refresh
+        </Button>
+      </div>
+
+      {historyBusy && <EmptyPanel text="Loading AI history..." />}
+      {historyError && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{historyError}</div>}
+      {!historyBusy && visibleHistory.length === 0 && !historyError && (
+        <EmptyPanel text="No AI history yet. Generate a scenario pack, executive summary, optimization review, or insights to begin building a comparison trail." />
+      )}
+      <HistoryComparison history={visibleHistory} />
+      <div className="space-y-3">
+        {visibleHistory.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onOpen(item)}
+            className="w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] px-4 py-4 text-left hover:bg-[var(--surface-muted)]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">{TYPE_LABELS[item.type] || item.type}</div>
+                <div className="mt-1 truncate text-sm font-semibold text-[var(--text-main)]">{item.title}</div>
+              </div>
+              <div className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                {item.savedAt ? new Date(item.savedAt).toLocaleDateString() : ''}
+              </div>
+            </div>
+            {item.description && <div className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{normalizeAiText(item.description)}</div>}
+            <HistoryMetricStrip metrics={item.metrics} />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -230,6 +340,11 @@ export default function AiChatSidebar() {
     sendChat,
     saveArtifact,
     setLastArtifactType,
+    history,
+    historyBusy,
+    historyError,
+    loadHistory,
+    openHistoryItem,
   } = useAi();
   const [draft, setDraft] = useState('');
   const [activeTab, setActiveTab] = useState('assistant');
@@ -250,6 +365,11 @@ export default function AiChatSidebar() {
     if (!sidebarOpen || !scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [chatMessages, sidebarOpen, chatBusy]);
+
+  useEffect(() => {
+    if (!sidebarOpen || activeTab !== 'history' || !projectId) return;
+    loadHistory({ force: false });
+  }, [activeTab, loadHistory, projectId, sidebarOpen]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -307,6 +427,16 @@ export default function AiChatSidebar() {
     }
   };
 
+  const handleOpenHistory = async (item) => {
+    const historyItem = await openHistoryItem(item.id);
+    if (!historyItem) return;
+    const type = historyItem.type;
+    if (['summary', 'scenarios', 'optimize', 'insights'].includes(type)) {
+      setSidebarOpen(false);
+      navigate(`/ai-analysis?type=${encodeURIComponent(type)}&historyId=${encodeURIComponent(historyItem.id)}`);
+    }
+  };
+
   if (!sidebarOpen) return null;
 
   return (
@@ -328,11 +458,12 @@ export default function AiChatSidebar() {
 
         <div className="border-b border-[var(--border-soft)] px-5 py-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="assistant" className="px-2">Assistant</TabsTrigger>
               <TabsTrigger value="explain" className="px-2">Explain</TabsTrigger>
               <TabsTrigger value="tools" className="px-2">Tools</TabsTrigger>
               <TabsTrigger value="insights" className="px-2">Insights</TabsTrigger>
+              <TabsTrigger value="history" className="px-2">History</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -490,6 +621,16 @@ export default function AiChatSidebar() {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-0">
+                <HistoryPanel
+                  history={history}
+                  historyBusy={historyBusy}
+                  historyError={historyError}
+                  onRefresh={() => loadHistory({ force: true })}
+                  onOpen={handleOpenHistory}
+                />
               </TabsContent>
             </Tabs>
           )}
