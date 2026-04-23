@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
   FileStack,
   FileText,
+  GalleryVerticalEnd,
   FolderKanban,
   LayoutDashboard,
   LogOut,
@@ -45,6 +46,7 @@ const navItems = [
   { to: '/depreciation', label: 'Depreciation', short: 'Depreciation', icon: TrendingDown },
   { to: '/financials', label: 'Financials', short: 'Financials', icon: BarChart3 },
   { to: '/reports', label: 'Reports', short: 'Reports', icon: FileText },
+  { to: '/presentation', label: 'Generate Presentation', short: 'Presentation', icon: GalleryVerticalEnd },
 ];
 
 const THEME_KEY = 'fm_theme';

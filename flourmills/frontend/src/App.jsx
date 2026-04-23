@@ -13,6 +13,7 @@ import Depreciation from './pages/Depreciation.jsx';
 import Financials from './pages/Financials.jsx';
 import Reports from './pages/Reports.jsx';
 import AiAnalysis from './pages/AiAnalysis.jsx';
+import PresentationBuilder from './pages/PresentationBuilder.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/depreciation" element={<RequireProject><Depreciation /></RequireProject>} />
         <Route path="/financials"   element={<RequireProject><Financials /></RequireProject>} />
         <Route path="/reports"      element={<RequireProject><Reports /></RequireProject>} />
+        <Route path="/presentation" element={<RequireProject><PresentationBuilder /></RequireProject>} />
         <Route path="/ai-analysis"  element={<RequireProject><AiAnalysis /></RequireProject>} />
         <Route path="*"             element={<Navigate to="/" replace />} />
       </Route>

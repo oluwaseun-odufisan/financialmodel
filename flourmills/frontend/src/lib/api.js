@@ -152,4 +152,50 @@ export const api = {
   },
   // AI FEATURE - GROK
   aiGetHistory: (historyId) => request(`/api/ai/history/${historyId}`),
+
+  getPresentationPresets: () => request('/api/presentations/presets'),
+  generatePresentationDraft: (projectId, options = {}) =>
+    request('/api/presentations/draft', {
+      method: 'POST',
+      body: JSON.stringify({ projectId, ...options }),
+    }).catch((error) => {
+      if (error.status !== 404) throw error;
+      return request(`/api/projects/${projectId}/presentation/draft`, {
+        method: 'POST',
+        body: JSON.stringify({ projectId, ...options }),
+      });
+    }),
+  listPresentationHistory: (projectId, limit = 20) =>
+    request(`/api/presentations/history?${new URLSearchParams({ projectId, limit: String(limit) }).toString()}`).catch((error) => {
+      if (error.status !== 404) throw error;
+      return request(`/api/projects/${projectId}/presentation/history?${new URLSearchParams({ limit: String(limit) }).toString()}`);
+    }),
+  getPresentationHistory: (projectId, historyId) =>
+    request(`/api/presentations/history/${historyId}`).catch((error) => {
+      if (error.status !== 404) throw error;
+      return request(`/api/projects/${projectId}/presentation/history/${historyId}`);
+    }),
+  downloadPresentation: async (projectId, filename = 'presentation.pptx', options = {}) => {
+    const token = getToken();
+    const requestExport = (path) => fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ projectId, ...options }),
+    });
+
+    let res = await requestExport('/api/presentations/export');
+    if (res.status === 404) res = await requestExport(`/api/projects/${projectId}/presentation/export`);
+
+    if (!res.ok) throw new Error(await extractBlobError(res, 'Presentation export failed'));
+    const blob = await res.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(downloadUrl);
+  },
 };

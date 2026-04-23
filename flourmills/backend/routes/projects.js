@@ -5,6 +5,12 @@ import { runModel, runSensitivity } from '../services/financialEngine.js';
 import { getTemplate, derive } from '../services/seedData.js';
 import { buildExcelWorkbook, buildPdfStream } from '../services/exportService.js';
 import { logAuditEvent } from '../services/auditService.js';
+import {
+  handlePresentationDraft,
+  handlePresentationExport,
+  handlePresentationHistory,
+  handlePresentationHistoryItem,
+} from './presentations.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -250,5 +256,10 @@ router.get('/:id/export/pdf', async (req, res) => {
     res.status(500).json({ error: `Export failed: ${error.message}` });
   }
 });
+
+router.get('/:id/presentation/history', handlePresentationHistory);
+router.get('/:id/presentation/history/:historyId', handlePresentationHistoryItem);
+router.post('/:id/presentation/draft', handlePresentationDraft);
+router.post('/:id/presentation/export', handlePresentationExport);
 
 export default router;

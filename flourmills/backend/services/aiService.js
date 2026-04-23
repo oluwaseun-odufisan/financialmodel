@@ -480,3 +480,32 @@ export async function generateReportInsights({ project }) {
 
   return parseJsonReply(raw);
 }
+
+// AI FEATURE - GROK
+export async function generatePresentationNarrative({ project, audience, slideOutline }) {
+  const projectContext = JSON.stringify(getProjectAiContext(project));
+  const cacheKey = `presentation:${String(project._id || project.id)}:${project.result?.computedAt || project.lastRunAt || 'na'}:${audience}`;
+
+  const raw = await callGrokChat({
+    cacheKey,
+    systemPrompt: getCoreSystemPrompt(),
+    userPrompt: [
+      'Improve the presentation narrative for an institutional project finance PowerPoint.',
+      'Use only the supplied slide ids. Do not invent financial numbers.',
+      'All numeric outputs must come from FULL_PROJECT_JSON. Do not override or recalculate them.',
+      'Return JSON only with this shape:',
+      '{"slides":[{"id":"...","title":"...","subtitle":"...","narrative":"...","bullets":["..."]}]}',
+      'Keep titles short, subtitles practical, narrative concise, and bullets decision-focused.',
+      'Avoid markdown, hype, generic AI language, and unsupported claims.',
+      `AUDIENCE=${audience}`,
+      `SLIDE_OUTLINE=${JSON.stringify(slideOutline)}`,
+      `FULL_PROJECT_JSON=${projectContext}`,
+    ].join('\n\n'),
+    temperature: 0.2,
+  });
+
+  const parsed = parseJsonReply(raw);
+  return {
+    slides: Array.isArray(parsed?.slides) ? parsed.slides : [],
+  };
+}
